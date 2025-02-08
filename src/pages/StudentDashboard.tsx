@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
-import { GraduationCap, Book, LogOut, Clock, Award, AlertCircle } from 'lucide-react';
+import { GraduationCap, Book, LogOut, Clock, Award, AlertCircle, UserPlus, User } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
 
@@ -21,27 +21,13 @@ interface Question {
   correct_answer: string;
 }
 
-interface QuizAttempt {
-  id: string;
-  quiz_id: string;
-  score: number;
-  completed_at: string;
-  answers: Record<string, string>;
-  quiz: {
-    title: string;
-    difficulty: string;
-    questions: string[];
-    answers_released: boolean;
-  };
-}
-
 function Sidebar() {
   const logout = useAuthStore((state) => state.logout);
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   return (
@@ -67,6 +53,20 @@ function Sidebar() {
           <Award className="w-5 h-5" />
           My Results
         </Link>
+        <Link
+          to="/student/join"
+          className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600"
+        >
+          <UserPlus className="w-5 h-5" />
+          Join Class
+        </Link>
+        <Link
+          to="/student/my-classes"
+          className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600"
+        >
+          <User className="w-5 h-5" />
+          My Classes
+        </Link>
         <button
           onClick={handleLogout}
           className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600 w-full text-left"
@@ -79,88 +79,324 @@ function Sidebar() {
   );
 }
 
-function QuizList() {
-  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [attemptedQuizzes, setAttemptedQuizzes] = useState<Set<string>>(new Set());
-  const navigate = useNavigate();
+function MyClasses() {
+  const [myClasses, setMyClasses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
     if (user) {
-      loadQuizzes();
-      loadAttemptedQuizzes();
+      fetchMyClasses();
     }
   }, [user]);
 
-  const loadQuizzes = async () => {
-    const { data } = await supabase
-      .from("quizzes")
-      .select('*')
-    .order("created_at", { ascending: false });
+  const fetchMyClasses = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      // Query the class_members table, joining the classes table
+      const { data, error } = await supabase
+        .from("class_members")
+        .select("*, classes(*)")
+        .eq("student_id", user.id);
 
-    console.log("load quizzz data",data);
-    
-    if (data) {
-      setQuizzes(data);
+      if (error) throw error;
+      setMyClasses(data);
+    } catch (err) {
+      console.error("Error fetching my classes:", err);
+      setError("Failed to load your classes. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  console.log("quizzes ",quizzes);
+  if (loading) {
+    return <div className="p-6">Loading...</div>;
+  }
 
-  const loadAttemptedQuizzes = async () => {
-    if (!user) return;
-
-    const { data } = await supabase
-      .from("quiz_attempts")
-      .select("quiz_id")
-      .eq("user_id", user.id);
-
-      console.log("load quizzz attempted", data);
-
-
-    if (data) {
-      setAttemptedQuizzes(new Set(data.map((attempt) => attempt.quiz_id)));
-    }
-  };
+  if (error) {
+    return <div className="p-6 text-red-600">{error}</div>;
+  }
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Available Quizzes</h2>
-      <div className="grid gap-4">
-        {quizzes.map((quiz) => {
-          const hasAttempted = attemptedQuizzes.has(quiz.id);
-          
-          return (
-            <div key={quiz.id} className="bg-white p-4 rounded-lg shadow">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900">{quiz.title}</h3>
-                  <p className="text-gray-500">{quiz.description}</p>
-                </div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">My Classes</h2>
+      {myClasses.length === 0 ? (
+        <div>You haven't joined any classes yet.</div>
+      ) : (
+        <div className="grid gap-4">
+          {myClasses.map((membership) => {
+            const joinedClass = membership.classes;
+            return (
+              <div
+                key={membership.id}
+                className="bg-white p-4 rounded-lg shadow"
+              >
+                <h3 className="text-lg font-medium text-gray-900">
+                  {joinedClass.name}
+                </h3>
+                <p className="text-gray-500">{joinedClass.description}</p>
+                <Link
+                  to={`/student/class/${joinedClass.id}`}
+                  className="mt-2 inline-block bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+                >
+                  View Details
+                </Link>
               </div>
-              <div className="mt-2 text-sm text-gray-500">
-                Time limit: {quiz.time_limit} minutes
-              </div>
-              {hasAttempted ? (
-                <div className="mt-4 flex items-center gap-2 text-purple-600">
-                  <AlertCircle className="w-5 h-5" />
-                  <span>You have already attempted this quiz</span>
-                </div>
-              ) : (
-                <button
-              onClick={() => navigate(`/student/quiz/${quiz.id}`)}
-              className="mt-4 w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700"
-            >
-              Start Quiz
-            </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
+
+function ClassDetails() {
+  const { classId } = useParams();
+  const [classData, setClassData] = useState(null);
+  const [quizzes, setQuizzes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (classId) {
+      fetchClassDetails();
+    }
+  }, [classId]);
+
+  const fetchClassDetails = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      // Fetch the class details from the classes table using classId
+      const { data: fetchedClass, error: classError } = await supabase
+        .from("classes")
+        .select("*")
+        .eq("id", classId)
+        .single();
+
+      if (classError || !fetchedClass) {
+        throw classError || new Error("Class not found.");
+      }
+      setClassData(fetchedClass);
+
+      // Now, use the class name as the category to fetch quizzes.
+      const { data: quizData, error: quizError } = await supabase
+        .from("quizzes")
+        .select("*")
+        .eq("category", fetchedClass.name) // Ensure that your quizzes table has a column named "category"
+        .order("created_at", { ascending: false });
+
+      if (quizError) {
+        throw quizError;
+      }
+      setQuizzes(quizData);
+    } catch (err) {
+      console.error("Error fetching class details or quizzes:", err);
+      setError("Failed to load class details. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="p-6">Loading...</div>;
+  }
+
+  if (error) {
+    return <div className="p-6 text-red-600">{error}</div>;
+  }
+
+  return (
+    <div className="p-6">
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">
+        {classData.name} - Quizzes
+      </h2>
+      {quizzes.length === 0 ? (
+        <div>No quizzes available for this class.</div>
+      ) : (
+        <div className="grid gap-4">
+          {quizzes.map((quiz) => (
+            <div key={quiz.id} className="bg-white p-4 rounded-lg shadow">
+              <h3 className="text-lg font-medium text-gray-900">
+                {quiz.title}
+              </h3>
+              <p className="text-gray-500">{quiz.description}</p>
+              <div className="mt-2 text-sm text-gray-500">
+                Time limit: {quiz.time_limit} minutes
+              </div>
+              <button
+                onClick={() => navigate(`/student/quiz/${quiz.id}`)}
+                className="mt-4 w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700"
+              >
+                Start Quiz
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// function MyClasses() {
+//   const [myClasses, setMyClasses] = useState([]);
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState("");
+//   const user = useAuthStore((state) => state.user);
+
+//   useEffect(() => {
+//     if (user) {
+//       fetchMyClasses();
+//     }
+//   }, [user]);
+
+//   const fetchMyClasses = async () => {
+//     setLoading(true);
+//     setError("");
+//     try {
+//       // Query the class_members table, and join the classes table
+//       const { data, error } = await supabase
+//         .from("class_members")
+//         .select("*, classes(*)")
+//         .eq("student_id", user.id);
+
+//       if (error) throw error;
+//       setMyClasses(data);
+//     } catch (err) {
+//       console.error("Error fetching my classes:", err);
+//       setError("Failed to load your classes. Please try again.");
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   if (loading) {
+//     return <div className="p-6">Loading...</div>;
+//   }
+
+//   if (error) {
+//     return <div className="p-6 text-red-600">{error}</div>;
+//   }
+
+//   return (
+//     <div className="p-6">
+//       <h2 className="text-2xl font-bold text-gray-900 mb-6">My Classes</h2>
+//       {myClasses.length === 0 ? (
+//         <div>You haven't joined any classes yet.</div>
+//       ) : (
+//         <div className="grid gap-4">
+//           {myClasses.map((membership) => {
+//             // membership.classes contains the details from the joined classes table
+//             const joinedClass = membership.classes;
+//             return (
+//               <div
+//                 key={membership.id}
+//                 className="bg-white p-4 rounded-lg shadow"
+//               >
+//                 <h3 className="text-lg font-medium text-gray-900">
+//                   {joinedClass.name}
+//                 </h3>
+//                 <p className="text-gray-500">{joinedClass.description}</p>
+//                 <Link
+//                   to={`/student/class/${joinedClass.id}`}
+//                   className="mt-2 inline-block bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+//                 >
+//                   View Class
+//                 </Link>
+//               </div>
+//             );
+//           })}
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
+
+// function QuizList() {
+//   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+//   const [attemptedQuizzes, setAttemptedQuizzes] = useState<Set<string>>(new Set());
+//   const navigate = useNavigate();
+//   const user = useAuthStore((state) => state.user);
+
+//   useEffect(() => {
+//     if (user) {
+//       loadQuizzes();
+//       loadAttemptedQuizzes();
+//     }
+//   }, [user]);
+
+//   const loadQuizzes = async () => {
+//     const { data } = await supabase
+//       .from("quizzes")
+//       .select('*')
+//     .order("created_at", { ascending: false });
+
+//     console.log("load quizzz data",data);
+    
+//     if (data) {
+//       setQuizzes(data);
+//     }
+//   };
+
+//   console.log("quizzes ",quizzes);
+
+//   const loadAttemptedQuizzes = async () => {
+//     if (!user) return;
+
+//     const { data } = await supabase
+//       .from("quiz_attempts")
+//       .select("quiz_id")
+//       .eq("user_id", user.id);
+
+//       console.log("load quizzz attempted", data);
+
+
+//     if (data) {
+//       setAttemptedQuizzes(new Set(data.map((attempt) => attempt.quiz_id)));
+//     }
+//   };
+
+//   return (
+//     <div className="p-6">
+//       <h2 className="text-2xl font-bold text-gray-900 mb-6">Available Quizzes</h2>
+//       <div className="grid gap-4">
+//         {quizzes.map((quiz) => {
+//           const hasAttempted = attemptedQuizzes.has(quiz.id);
+          
+//           return (
+//             <div key={quiz.id} className="bg-white p-4 rounded-lg shadow">
+//               <div className="flex justify-between items-start">
+//                 <div>
+//                   <h3 className="text-lg font-medium text-gray-900">{quiz.title}</h3>
+//                   <p className="text-gray-500">{quiz.description}</p>
+//                 </div>
+//               </div>
+//               <div className="mt-2 text-sm text-gray-500">
+//                 Time limit: {quiz.time_limit} minutes
+//               </div>
+//               {hasAttempted ? (
+//                 <div className="mt-4 flex items-center gap-2 text-purple-600">
+//                   <AlertCircle className="w-5 h-5" />
+//                   <span>You have already attempted this quiz</span>
+//                 </div>
+//               ) : (
+//                 <button
+//               onClick={() => navigate(`/student/quiz/${quiz.id}`)}
+//               className="mt-4 w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700"
+//             >
+//               Start Quiz
+//             </button>
+//               )}
+//             </div>
+//           );
+//         })}
+//       </div>
+//     </div>
+//   );
+// }
 
 function TakeQuiz() {
   const { quizId } = useParams();
@@ -523,16 +759,154 @@ function QuizHistory() {
     </div>
   );
 }
+function JoinClass() {
+  const [joinCode, setJoinCode] = useState("");
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
 
+  // const handleJoin = async (e) => {
+  //   e.preventDefault();
+  //   setError("");
+
+  //   try {
+  //     // Query the classes table for a matching join code
+  //     const { data, error: fetchError } = await supabase
+  //       .from("classes")
+  //       .select("*")
+  //       .eq("join_code", joinCode)
+  //       .single();
+
+  //     if (fetchError) {
+  //       console.error("Error fetching class:", fetchError);
+  //       setError("Invalid join code.");
+  //       return;
+  //     }
+
+  //     // Assuming a join table "class_members" exists to track enrollment:
+  //     // Inside handleJoin
+  //     const { error: joinError } = await supabase.from("class_members").insert([
+  //       {
+  //         class_id: data.id,
+  //         student_id: user.id,
+  //       },
+  //     ]);
+
+  //     if (joinError) {
+  //       console.error("Error joining class (join table):", joinError);
+  //       setError(`Failed to join class. ${joinError.message}`);
+  //       return;
+  //     }
+
+  //     // Redirect to the student dashboard (or class page) after successful join
+  //     navigate("/student");
+  //   } catch (err) {
+  //     console.error(err);
+  //     setError("An error occurred. Please try again.");
+  //   }
+  // };
+const handleJoin = async (e) => {
+  e.preventDefault();
+  setError("");
+
+  // Check if user exists
+  if (!user) {
+    setError("You must be logged in to join a class.");
+    return;
+  }
+
+  try {
+    // Query the classes table for a matching join code
+    const { data: classData, error: fetchError } = await supabase
+      .from("classes")
+      .select("*")
+      .eq("join_code", joinCode.trim())
+      .single();
+
+    if (fetchError || !classData) {
+      console.error("Error fetching class:", fetchError);
+      setError("Invalid join code.");
+      return;
+    }
+
+    // Check if the student is already enrolled in the class
+    const { data: existingMembership, error: checkError } = await supabase
+      .from("class_members")
+      .select("*")
+      .eq("class_id", classData.id)
+      .eq("student_id", user.id)
+      .single();
+
+    if (existingMembership) {
+      setError("You are already enrolled in this class.");
+      return;
+    }
+    if (checkError && checkError.code !== "PGRST116") {
+      console.error("Error checking membership:", checkError);
+      setError("An error occurred. Please try again.");
+      return;
+    }
+
+    // Insert the membership record
+    const { error: joinError } = await supabase.from("class_members").insert([
+      {
+        class_id: classData.id,
+        student_id: user.id,
+      },
+    ]);
+
+    if (joinError) {
+      console.error("Error joining class (join table):", joinError);
+      setError(`Failed to join class. ${joinError.message}`);
+      return;
+    }
+
+    // Redirect to the student dashboard (or class page) after successful join
+    navigate("/student");
+  } catch (err) {
+    console.error(err);
+    setError("An error occurred. Please try again.");
+  }
+};
+
+  return (
+    <div className="p-6 max-w-md mx-auto">
+      <h2 className="text-2xl font-bold mb-4">Join Class</h2>
+      {error && <div className="bg-red-200 text-red-600 p-2 mb-4">{error}</div>}
+      <form onSubmit={handleJoin}>
+        <label className="block text-sm font-medium mb-2">
+          Enter Join Code:
+        </label>
+        <input
+          type="text"
+          value={joinCode}
+          onChange={(e) => setJoinCode(e.target.value)}
+          className="w-full p-2 border border-gray-300 rounded-md mb-4"
+          placeholder="Enter class join code"
+          required
+        />
+        <button
+          type="submit"
+          className="w-full bg-purple-600 text-white py-2 rounded-md hover:bg-purple-700"
+        >
+          Join Class
+        </button>
+      </form>
+    </div>
+  );
+}
 export default function StudentDashboard() {
   return (
     <div className="flex min-h-screen bg-gray-100">
       <Sidebar />
       <div className="flex-1">
         <Routes>
-          <Route path="/" element={<QuizList />} />
-          <Route path="/quiz/:quizId" element={<TakeQuiz />} />
-          <Route path="/history" element={<QuizHistory />} />
+          {/* <Route path="/" element={<QuizList />} /> */}
+          <Route path="join" element={<JoinClass />} />
+          <Route path="quiz/:quizId" element={<TakeQuiz />} />
+          <Route path="history" element={<QuizHistory />} />
+          <Route path="my-classes" element={<MyClasses />} />
+          <Route path="class/:classId" element={<ClassDetails />} />
         </Routes>
       </div>
     </div>

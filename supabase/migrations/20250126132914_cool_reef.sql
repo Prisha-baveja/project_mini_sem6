@@ -1,45 +1,3 @@
-/*
-  # Initial Quizzoo Schema
-
-  1. New Tables
-    - `profiles`
-      - `id` (uuid, primary key) - References auth.users
-      - `username` (text, unique)
-      - `role` (text) - Either 'student' or 'teacher'
-      - `last_login` (timestamptz)
-      - `current_session` (text) - For tracking active sessions
-    
-    - `questions`
-      - `id` (uuid, primary key)
-      - `created_by` (uuid) - References profiles
-      - `question` (text)
-      - `options` (jsonb) - Array of options
-      - `correct_answer` (text)
-      - `difficulty` (text)
-      - `category` (text)
-    
-    - `quizzes`
-      - `id` (uuid, primary key)
-      - `created_by` (uuid) - References profiles
-      - `title` (text)
-      - `description` (text)
-      - `questions` (jsonb) - Array of question IDs
-      - `difficulty` (text)
-      - `time_limit` (integer) - In minutes
-    
-    - `quiz_attempts`
-      - `id` (uuid, primary key)
-      - `quiz_id` (uuid) - References quizzes
-      - `user_id` (uuid) - References profiles
-      - `score` (integer)
-      - `answers` (jsonb)
-      - `completed_at` (timestamptz)
-
-  2. Security
-    - Enable RLS on all tables
-    - Add policies for teachers and students
-*/
-
 -- Create tables
 CREATE TABLE profiles (
   id uuid PRIMARY KEY REFERENCES auth.users,
@@ -60,46 +18,6 @@ CREATE TABLE questions (
   category text NOT NULL,
   created_at timestamptz DEFAULT now()
 );
-
--- CREATE TABLE quizzes (
---   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
---   created_by uuid REFERENCES profiles NOT NULL,
---   title text NOT NULL,
---   description text,
---   questions jsonb NOT NULL,
---   difficulty text NOT NULL CHECK (difficulty IN ('easy', 'medium', 'hard')),
---   time_limit integer NOT NULL,
---   created_at timestamptz DEFAULT now()
--- );
-
--- CREATE TABLE quiz_attempts (
---   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
---   quiz_id uuid REFERENCES quizzes NOT NULL,
---   user_id uuid REFERENCES profiles NOT NULL,
---   score integer NOT NULL,
---   answers jsonb NOT NULL,
---   completed_at timestamptz DEFAULT now()
--- );
-
--- CREATE TABLE quizzes (
---   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
---   created_by uuid REFERENCES profiles NOT NULL,
---   title text NOT NULL,
---   description text,
---   questions jsonb NOT NULL,
---   difficulty text NOT NULL CHECK (difficulty IN ('easy', 'medium', 'hard')),
---   time_limit integer NOT NULL,
---   created_at timestamptz DEFAULT now()
--- );
-
--- CREATE TABLE quiz_attempts (
---   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
---   quiz_id uuid REFERENCES quizzes ON DELETE CASCADE NOT NULL,  -- Added ON DELETE CASCADE
---   user_id uuid REFERENCES profiles NOT NULL,
---   score integer NOT NULL,
---   answers jsonb NOT NULL,
---   completed_at timestamptz DEFAULT now()
--- );
 
 CREATE TABLE quizzes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -128,7 +46,6 @@ REFERENCES quizzes (id)
 ON DELETE CASCADE;
 
 
-
 -- Enable RLS
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
@@ -155,18 +72,6 @@ CREATE POLICY "Teachers can create questions"
     WHERE profiles.id = auth.uid()
     AND profiles.role = 'teacher'
   ));
-
--- CREATE POLICY "Teachers can update their own questions"
---   ON questions FOR UPDATE
---   TO authenticated
---   USING (
---     created_by = auth.uid() 
---     AND EXISTS (
---       SELECT 1 FROM profiles
---       WHERE profiles.id = auth.uid()
---       AND profiles.role = 'teacher'
---     )
---   );
 
 CREATE POLICY "Teachers can update their own questions"
   ON questions FOR UPDATE
@@ -205,16 +110,37 @@ CREATE POLICY "Teachers can delete their own questions"
   USING (created_by = auth.uid());
 
 -- Quizzes policies
-CREATE POLICY "Teachers can create quizzes"
-  ON quizzes FOR INSERT
+-- CREATE POLICY "Teachers can create quizzes"
+--   ON quizzes FOR INSERT
+--   TO authenticated
+--   WITH CHECK (
+--     EXISTS (
+--       SELECT 1 FROM profiles
+--       WHERE profiles.id = auth.uid()
+--       AND profiles.role = 'teacher'
+--     )
+--   );
+
+DROP POLICY IF EXISTS "Teachers can create questions" ON questions;
+CREATE POLICY "Teachers can create questions"
+  ON questions FOR INSERT
   TO authenticated
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM profiles
       WHERE profiles.id = auth.uid()
-      AND profiles.role = 'teacher'
+        AND profiles.role = 'teacher'
+    )
+    AND (
+      class_id IS NULL
+      OR EXISTS (
+        SELECT 1 FROM classes
+        WHERE classes.id = class_id
+          AND classes.created_by = auth.uid()
+      )
     )
   );
+
 
 CREATE POLICY "Teachers can update their own quizzes"
   ON quizzes FOR UPDATE

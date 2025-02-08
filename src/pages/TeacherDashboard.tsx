@@ -1,9 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Link, useNavigate } from 'react-router-dom';
-import { GraduationCap, Book, LogOut, Plus, List, BarChart, Users, Award } from 'lucide-react';
+import { Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
+import { GraduationCap, Book, LogOut, Plus, List, BarChart, Users, Award, User } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
 import { FaChalkboard } from "react-icons/fa";
+import { PlusCircle } from "lucide-react";
+import { Navigate } from "react-router-dom";
+import { nanoid } from 'nanoid';
+// import { Class } from "some-library";
+
+interface Class {
+  id: string;
+  name: string;
+  description: string;
+  join_code: string;
+  // Add other properties if needed
+}
 
 interface Question {
   id: string;
@@ -112,13 +124,6 @@ function Sidebar() {
           Classes
         </Link>
         <Link
-          to="/teacher"
-          className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600"
-        >
-          <Book className="w-5 h-5" />
-          Questions
-        </Link>
-        <Link
           to="/teacher/quizzes"
           className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600"
         >
@@ -144,118 +149,118 @@ function Sidebar() {
   );
 }
 
-function TeacherClasses() {
-  const [subjects, setSubjects] = useState([]);
-  const [newSubject, setNewSubject] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const user = useAuthStore((state) => state.user);
-  const navigate = useNavigate();
+// function TeacherClasses() {
+//   const [subjects, setSubjects] = useState([]);
+//   const [newSubject, setNewSubject] = useState("");
+//   const [showForm, setShowForm] = useState(false);
+//   const user = useAuthStore((state) => state.user);
+//   const navigate = useNavigate();
 
-  // When component mounts, log and load subjects
-  useEffect(() => {
-    console.log("TeacherClasses component mounted.");
-    loadSubjects();
-  }, []);
+//   // When component mounts, log and load subjects
+//   useEffect(() => {
+//     console.log("TeacherClasses component mounted.");
+//     loadSubjects();
+//   }, []);
 
-  const loadSubjects = async () => {
-    console.log("Loading subjects from Supabase...");
-    try {
-      const { data, error } = await supabase
-        .from("subjects")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) {
-        console.error("Error fetching subjects:", error);
-      } else {
-        console.log("Fetched subjects:", data);
-        setSubjects(data || []);
-      }
-    } catch (err) {
-      console.error("Unexpected error in loadSubjects:", err);
-    }
-  };
+//   const loadSubjects = async () => {
+//     console.log("Loading subjects from Supabase...");
+//     try {
+//       const { data, error } = await supabase
+//         .from("subjects")
+//         .select("*")
+//         .order("created_at", { ascending: false });
+//       if (error) {
+//         console.error("Error fetching subjects:", error);
+//       } else {
+//         console.log("Fetched subjects:", data);
+//         setSubjects(data || []);
+//       }
+//     } catch (err) {
+//       console.error("Unexpected error in loadSubjects:", err);
+//     }
+//   };
 
-  const handleAddSubject = async (e) => {
-    e.preventDefault();
-    if (!newSubject.trim()) {
-      console.log("New subject input is empty.");
-      return;
-    }
-    console.log("Adding new subject:", newSubject.trim());
-    try {
-      const { data, error } = await supabase
-        .from("subjects")
-        .insert([{ subject_name: newSubject.trim(), created_by: user?.id }]);
-      if (error) {
-        console.error("Error adding subject:", error);
-        alert("An error occurred while adding the subject.");
-      } else {
-        console.log("Subject added successfully:", data);
-        setNewSubject("");
-        setShowForm(false);
-        loadSubjects(); // Reload subjects after insertion
-      }
-    } catch (err) {
-      console.error("Unexpected error in handleAddSubject:", err);
-    }
-  };
+//   const handleAddSubject = async (e) => {
+//     e.preventDefault();
+//     if (!newSubject.trim()) {
+//       console.log("New subject input is empty.");
+//       return;
+//     }
+//     console.log("Adding new subject:", newSubject.trim());
+//     try {
+//       const { data, error } = await supabase
+//         .from("subjects")
+//         .insert([{ subject_name: newSubject.trim(), created_by: user?.id }]);
+//       if (error) {
+//         console.error("Error adding subject:", error);
+//         alert("An error occurred while adding the subject.");
+//       } else {
+//         console.log("Subject added successfully:", data);
+//         setNewSubject("");
+//         setShowForm(false);
+//         loadSubjects(); // Reload subjects after insertion
+//       }
+//     } catch (err) {
+//       console.error("Unexpected error in handleAddSubject:", err);
+//     }
+//   };
 
-  return (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Classes</h2>
+//   return (
+//     <div className="p-6">
+//       <h2 className="text-2xl font-bold text-gray-900 mb-6">Classes</h2>
 
-      <button
-        onClick={() => setShowForm(!showForm)}
-        className="mb-4 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-      >
-        {showForm ? "Cancel" : "Add Subject"}
-      </button>
+//       <button
+//         onClick={() => setShowForm(!showForm)}
+//         className="mb-4 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+//       >
+//         {showForm ? "Cancel" : "Add Subject"}
+//       </button>
 
-      {showForm && (
-        <form onSubmit={handleAddSubject} className="mb-6">
-          <input
-            type="text"
-            placeholder="Enter Subject Name"
-            value={newSubject}
-            onChange={(e) => setNewSubject(e.target.value)}
-            className="border rounded px-4 py-2 mr-2"
-          />
-          <button
-            type="submit"
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-          >
-            Create Class
-          </button>
-        </form>
-      )}
+//       {showForm && (
+//         <form onSubmit={handleAddSubject} className="mb-6">
+//           <input
+//             type="text"
+//             placeholder="Enter Subject Name"
+//             value={newSubject}
+//             onChange={(e) => setNewSubject(e.target.value)}
+//             className="border rounded px-4 py-2 mr-2"
+//           />
+//           <button
+//             type="submit"
+//             className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+//           >
+//             Create Class
+//           </button>
+//         </form>
+//       )}
 
-      {subjects.length === 0 ? (
-        <p className="text-gray-500">
-          No subjects available. Add one to create a class.
-        </p>
-      ) : (
-        <div className="grid gap-4">
-          {subjects.map((subject) => (
-            <div
-              key={subject.id}
-              className="bg-white p-4 rounded shadow flex justify-between items-center"
-            >
-              <span className="text-lg font-medium">
-                {subject.subject_name}
-              </span>
-              <button
-                onClick={() => navigate(`/teacher/classes/${subject.id}`)}
-                className="text-purple-600 hover:text-purple-800"
-              >
-                Open Class
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+//       {subjects.length === 0 ? (
+//         <p className="text-gray-500">
+//           No subjects available. Add one to create a class.
+//         </p>
+//       ) : (
+//         <div className="grid gap-4">
+//           {subjects.map((subject) => (
+//             <div
+//               key={subject.id}
+//               className="bg-white p-4 rounded shadow flex justify-between items-center"
+//             >
+//               <span className="text-lg font-medium">
+//                 {subject.subject_name}
+//               </span>
+//               <button
+//                 onClick={() => navigate(`/teacher/classes/${subject.id}`)}
+//                 className="text-purple-600 hover:text-purple-800"
+//               >
+//                 Open Class
+//               </button>
+//             </div>
+//           ))}
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
 
 function Statistics() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
@@ -373,260 +378,316 @@ function Statistics() {
   );
 }
 
-function QuestionForm({ onSubmit, initialData = null }: { onSubmit: (data: any) => void; initialData?: any }) {
-  const [question, setQuestion] = useState(initialData?.question || '');
-  const [options, setOptions] = useState<string[]>(initialData?.options || ['', '', '', '']);
-  const [correctAnswer, setCorrectAnswer] = useState(initialData?.correct_answer || '');
-  const [difficulty, setDifficulty] = useState(initialData?.difficulty || 'medium');
-  const [category, setCategory] = useState(initialData?.category || '');
+// function Classes() {
+//   const [classes, setClasses] = useState<Class[]>([]);
+//   const [showCreateForm, setShowCreateForm] = useState(false);
+//   const [newClassName, setNewClassName] = useState("");
+//   const [newClassDescription, setNewClassDescription] = useState("");
+//   const user = useAuthStore((state) => state.user);
+//   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit({
-      question,
-      options,
-      correct_answer: correctAnswer,
-      difficulty,
-      category,
-    });
-  };
+//   useEffect(() => {
+//     if (user) {
+//       loadClasses();
+//     }
+//   }, [user]);
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Question</label>
-        <textarea
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-          rows={3}
-          required
-        />
-      </div>
+//   const loadClasses = async () => {
+//     try {
+//       const { data, error } = await supabase
+//         .from("classes")
+//         .select("*")
+//         .eq("created_by", user?.id)
+//         .order("created_at", { ascending: false });
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Options</label>
-        {options.map((option, index) => (
-          <input
-            key={index}
-            type="text"
-            value={option}
-            onChange={(e) => {
-              const newOptions = [...options];
-              newOptions[index] = e.target.value;
-              setOptions(newOptions);
-            }}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-            placeholder={`Option ${index + 1}`}
-            required
-          />
-        ))}
-      </div>
+//       if (error) throw error;
+//       if (data) {
+//         setClasses(data);
+//       }
+//     } catch (err) {
+//       console.error("Error loading classes:", err);
+//     }
+//   };
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Correct Answer</label>
-        <select
-          value={correctAnswer}
-          onChange={(e) => setCorrectAnswer(e.target.value)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-          required
-        >
-          <option value="">Select correct answer</option>
-          {options.map((option, index) => (
-            <option key={index} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      </div>
+//   // const handleCreateClass = async (e: React.FormEvent) => {
+//   //   e.preventDefault();
+//   //   if (!user) return;
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Difficulty</label>
-        <select
-          value={difficulty}
-          onChange={(e) => setDifficulty(e.target.value as 'easy' | 'medium' | 'hard')}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-          required
-        >
-          <option value="easy">Easy</option>
-          <option value="medium">Medium</option>
-          <option value="hard">Hard</option>
-        </select>
-      </div>
+//   //   try {
+//   //     const { error } = await supabase.from("classes").insert([
+//   //       {
+//   //         name: newClassName.trim(),
+//   //         description: newClassDescription.trim(),
+//   //         created_by: user.id,
+//   //       },
+//   //     ]);
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Category</label>
-        <input
-          type="text"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-          required
-        />
-      </div>
+//   //     if (error) throw error;
 
-      <button
-        type="submit"
-        className="w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
-      >
-        {initialData ? 'Update Question' : 'Add Question'}
-      </button>
-    </form>
-  );
-}
+//   //     setNewClassName("");
+//   //     setNewClassDescription("");
+//   //     setShowCreateForm(false);
+//   //     loadClasses();
+//   //   } catch (err) {
+//   //     console.error("Error creating class:", err);
+//   //   }
+//   // };
 
-function Questions() {
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+// const handleCreateClass = async (e: React.FormEvent) => {
+//   e.preventDefault();
+//   if (!user) return;
+
+//   try {
+//     // Generate an 8-character unique join code
+//     const joinCode = nanoid(8);
+
+//     const { error } = await supabase.from("classes").insert([
+//       {
+//         name: newClassName.trim(),
+//         description: newClassDescription.trim(),
+//         created_by: user.id,
+//         join_code: joinCode, // Store the join code with the class record
+//       },
+//     ]);
+
+//     if (error) throw error;
+
+//     setNewClassName("");
+//     setNewClassDescription("");
+//     setShowCreateForm(false);
+//     loadClasses();
+//   } catch (err) {
+//     console.error("Error creating class:", err);
+//   }
+// };
+
+
+//   return (
+//     <div className="p-6">
+//       <div className="flex justify-between items-center mb-6">
+//         <h2 className="text-2xl font-bold text-gray-900">Classes</h2>
+//         <button
+//           onClick={() => setShowCreateForm(true)}
+//           className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center gap-2"
+//         >
+//           <PlusCircle className="w-5 h-5" />
+//           Create Class
+//         </button>
+//       </div>
+
+//       {showCreateForm && (
+//         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+//           <div className="bg-white rounded-lg p-6 w-full max-w-md">
+//             <h3 className="text-xl font-bold mb-4">Create New Class</h3>
+//             <form onSubmit={handleCreateClass}>
+//               <div className="mb-4">
+//                 <label className="block text-sm font-medium text-gray-700">
+//                   Class Name
+//                 </label>
+//                 <input
+//                   type="text"
+//                   value={newClassName}
+//                   onChange={(e) => setNewClassName(e.target.value)}
+//                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//                   required
+//                 />
+//               </div>
+//               <div className="mb-4">
+//                 <label className="block text-sm font-medium text-gray-700">
+//                   Description
+//                 </label>
+//                 <textarea
+//                   value={newClassDescription}
+//                   onChange={(e) => setNewClassDescription(e.target.value)}
+//                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//                   rows={3}
+//                 />
+//               </div>
+//               <div className="flex justify-end gap-2">
+//                 <button
+//                   type="button"
+//                   onClick={() => setShowCreateForm(false)}
+//                   className="px-4 py-2 text-gray-600 hover:text-gray-800"
+//                 >
+//                   Cancel
+//                 </button>
+//                 <button
+//                   type="submit"
+//                   className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+//                 >
+//                   Create
+//                 </button>
+//               </div>
+//             </form>
+//           </div>
+//         </div>
+//       )}
+
+//       <div className="grid gap-4">
+//         {classes.map((cls) => (
+//           <div
+//             key={cls.id}
+//             className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow"
+//           >
+//             <div className="flex justify-between items-start">
+//               <div>
+//                 <h3 className="text-lg font-medium text-gray-900">
+//                   {cls.name}
+//                 </h3>
+//                 <p className="text-gray-500">{cls.description}</p>
+//               </div>
+//               <button
+//                 onClick={() => navigate(`/teacher/classes/${cls.id}`)}
+//                 className="text-purple-600 hover:text-purple-800"
+//               >
+//                 View Questions
+//               </button>
+//             </div>
+//           </div>
+//         ))}
+//       </div>
+//     </div>
+//   );
+// }
+
+function Classes() {
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newClassName, setNewClassName] = useState("");
+  const [newClassDescription, setNewClassDescription] = useState("");
   const user = useAuthStore((state) => state.user);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    loadQuestions();
-  }, []);
-
-  const fetchUser = async () => {
-    const { data, error } = await supabase.auth.getUser();
-
-    if (error) {
-      console.error("Error fetching user:", error);
-    } else {
-      console.log("Auth UID:", data?.user?.id);
+    if (user) {
+      loadClasses();
     }
-  };
-  fetchUser();
+  }, [user]);
 
+  const loadClasses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("classes")
+        .select("*")
+        .eq("created_by", user?.id)
+        .order("created_at", { ascending: false });
 
-  const loadQuestions = async () => {
-    console.log("loading questions..");
-    const { data, error } = await supabase
-      .from('questions')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      console.log("error fetching questions", error);
-      alert("an error occured while fetching questions");
-    }
-    else{
-       console.log("Fetched Questions:", data);
-       setQuestions(data || []);
-    }
-  };
-
-  const handleSubmit = async (data: any) => {
-    if (editingQuestion) {
-      await supabase
-        .from('questions')
-        .update(data)
-        .eq('id', editingQuestion.id);
-    } else {
-      await supabase
-        .from('questions')
-        .insert([{ ...data, created_by: user?.id }]);
-    }
-    
-    setShowForm(false);
-    setEditingQuestion(null);
-    loadQuestions();
-  };
-
-  const handleEdit = (question: Question) => {
-    setEditingQuestion(question);
-    setShowForm(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    console.log(`Attempting to delete question with ID: ${id}`); // Log the ID
-
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this question?"
-    );
-    if (confirmDelete) {
-      console.log("User confirmed deletion"); // Log confirmation
-
-      const { error } = await supabase.from("questions").delete().eq("id", id);
-
-      if (error) {
-        console.error("Error deleting question:", error);
-        alert("An error occurred while deleting the question.");
-      } else {
-        console.log("Question deleted successfully");
-        loadQuestions();
+      if (error) throw error;
+      if (data) {
+        setClasses(data);
       }
-    } else {
-      console.log("User canceled deletion"); // Log cancellation
+    } catch (err) {
+      console.error("Error loading classes:", err);
     }
   };
 
+  const handleCreateClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
 
-  // console.log("Auth UID:", supabase.auth.getUser());
+    try {
+      // Generate an 8-character unique join code
+      const joinCode = nanoid(8);
+
+      const { error } = await supabase.from("classes").insert([
+        {
+          name: newClassName.trim(),
+          description: newClassDescription.trim(),
+          created_by: user.id,
+          join_code: joinCode, // Store the join code with the class record
+        },
+      ]);
+
+      if (error) throw error;
+
+      setNewClassName("");
+      setNewClassDescription("");
+      setShowCreateForm(false);
+      loadClasses();
+    } catch (err) {
+      console.error("Error creating class:", err);
+    }
+  };
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Questions</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Classes</h2>
         <button
-          onClick={() => {
-            setEditingQuestion(null);
-            setShowForm(!showForm);
-          }}
-          className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+          onClick={() => setShowCreateForm(true)}
+          className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center gap-2"
         >
-          <Plus className="w-5 h-5" />
-          Add Question
+          <PlusCircle className="w-5 h-5" />
+          Create Class
         </button>
       </div>
 
-      {showForm && (
-        <div className="mb-6 bg-white p-6 rounded-lg shadow">
-          <QuestionForm onSubmit={handleSubmit} initialData={editingQuestion} />
+      {showCreateForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-xl font-bold mb-4">Create New Class</h3>
+            <form onSubmit={handleCreateClass}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">
+                  Class Name
+                </label>
+                <input
+                  type="text"
+                  value={newClassName}
+                  onChange={(e) => setNewClassName(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">
+                  Description
+                </label>
+                <textarea
+                  value={newClassDescription}
+                  onChange={(e) => setNewClassDescription(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                  rows={3}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateForm(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+                >
+                  Create
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       <div className="grid gap-4">
-        {questions.map((question) => (
-          <div key={question.id} className="bg-white p-4 rounded-lg shadow">
-            <div className="flex justify-between items-start">
-              <h3 className="text-lg font-medium text-gray-900">{question.question}</h3>
-              <div className="flex items-center gap-2">
-                <span className={`px-2 py-1 rounded text-sm ${
-                  question.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
-                  question.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-red-100 text-red-800'
-                }`}>
-                  {question.difficulty}
-                </span>
-                <button
-                  onClick={() => handleEdit(question)}
-                  className="text-blue-600 hover:text-blue-800"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(question.id)}
-                  className="text-red-600 hover:text-red-800"
-                >
-                  Delete
-                </button>
-              </div>
+        {classes.map((cls) => (
+          <div
+            key={cls.id}
+            className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow"
+          >
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">{cls.name}</h3>
+              <p className="text-gray-500">{cls.description}</p>
             </div>
-            <div className="mt-2 space-y-2">
-              {question.options.map((option, index) => (
-                <div
-                  key={index}
-                  className={`p-2 rounded ${
-                    option === question.correct_answer
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-50'
-                  }`}
-                >
-                  {option}
-                </div>
-              ))}
-            </div>
-            <div className="mt-2 text-sm text-gray-500">
-              Subject: {question.category}
+            <div className="flex justify-between items-center mt-4">
+              <button
+                onClick={() => navigate(`/teacher/classes/${cls.id}`)}
+                className="text-purple-600 hover:text-purple-800"
+              >
+                View Questions
+              </button>
+              <p className="text-gray-500">Class Code: {cls.join_code}</p>
             </div>
           </div>
         ))}
@@ -635,13 +696,497 @@ function Questions() {
   );
 }
 
+function ClassQuestions() {
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newQuestion, setNewQuestion] = useState({
+    question: "",
+    options: ["", "", "", ""],
+    correct_answer: "",
+    difficulty: "medium" as "easy" | "medium" | "hard",
+  });
+  const { classId } = useParams();
+  const user = useAuthStore((state) => state.user);
+
+  useEffect(() => {
+    if (classId) {
+      loadQuestions();
+    }
+  }, [classId]);
+
+  const loadQuestions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("questions")
+        .select("*")
+        .eq("class_id", classId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      if (data) {
+        setQuestions(data);
+      }
+    } catch (err) {
+      console.error("Error loading questions:", err);
+    }
+  };
+
+  const handleCreateQuestion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !classId) return;
+
+    try {
+      const { error } = await supabase.from("questions").insert([
+        {
+          ...newQuestion,
+          class_id: classId,
+          created_by: user.id,
+        },
+      ]);
+
+      if (error) throw error;
+
+      setShowCreateForm(false);
+      setNewQuestion({
+        question: "",
+        options: ["", "", "", ""],
+        correct_answer: "",
+        difficulty: "medium",
+      });
+      loadQuestions();
+    } catch (err) {
+      console.error("Error creating question:", err);
+    }
+  };
+
+  return (
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">Questions</h2>
+        <button
+          onClick={() => setShowCreateForm(true)}
+          className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center gap-2"
+        >
+          <Plus className="w-5 h-5" />
+          Add Question
+        </button>
+      </div>
+
+      {showCreateForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
+            <h3 className="text-xl font-bold mb-4">Create New Question</h3>
+            <form onSubmit={handleCreateQuestion}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">
+                  Question
+                </label>
+                <textarea
+                  value={newQuestion.question}
+                  onChange={(e) =>
+                    setNewQuestion({ ...newQuestion, question: e.target.value })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                  rows={3}
+                  required
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Options
+                </label>
+                {newQuestion.options.map((option, index) => (
+                  <div key={index} className="mb-2">
+                    <input
+                      type="text"
+                      value={option}
+                      onChange={(e) => {
+                        const newOptions = [...newQuestion.options];
+                        newOptions[index] = e.target.value;
+                        setNewQuestion({ ...newQuestion, options: newOptions });
+                      }}
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                      placeholder={`Option ${index + 1}`}
+                      required
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">
+                  Correct Answer
+                </label>
+                <select
+                  value={newQuestion.correct_answer}
+                  onChange={(e) =>
+                    setNewQuestion({
+                      ...newQuestion,
+                      correct_answer: e.target.value,
+                    })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                  required
+                >
+                  <option value="">Select correct answer</option>
+                  {newQuestion.options.map((option, index) => (
+                    <option key={index} value={option}>
+                      {option || `Option ${index + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">
+                  Difficulty
+                </label>
+                <select
+                  value={newQuestion.difficulty}
+                  onChange={(e) =>
+                    setNewQuestion({
+                      ...newQuestion,
+                      difficulty: e.target.value as "easy" | "medium" | "hard",
+                    })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                >
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateForm(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+                >
+                  Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-4">
+        {questions.map((question) => (
+          <div key={question.id} className="bg-white p-4 rounded-lg shadow">
+            <div className="flex justify-between items-start">
+              <h3 className="text-lg font-medium text-gray-900">
+                {question.question}
+              </h3>
+              <span
+                className={`px-2 py-1 rounded text-sm ${
+                  question.difficulty === "easy"
+                    ? "bg-green-100 text-green-800"
+                    : question.difficulty === "medium"
+                    ? "bg-yellow-100 text-yellow-800"
+                    : "bg-red-100 text-red-800"
+                }`}
+              >
+                {question.difficulty}
+              </span>
+            </div>
+            <div className="mt-4 space-y-2">
+              {question.options.map((option, index) => (
+                <div
+                  key={index}
+                  className={`p-2 rounded ${
+                    option === question.correct_answer
+                      ? "bg-green-100 text-green-800"
+                      : "bg-gray-50"
+                  }`}
+                >
+                  {option}
+                  {option === question.correct_answer && " (Correct)"}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// function QuestionForm({ onSubmit, initialData = null }: { onSubmit: (data: any) => void; initialData?: any }) {
+//   const [question, setQuestion] = useState(initialData?.question || '');
+//   const [options, setOptions] = useState<string[]>(initialData?.options || ['', '', '', '']);
+//   const [correctAnswer, setCorrectAnswer] = useState(initialData?.correct_answer || '');
+//   const [difficulty, setDifficulty] = useState(initialData?.difficulty || 'medium');
+//   const [category, setCategory] = useState(initialData?.category || '');
+
+//   const handleSubmit = (e: React.FormEvent) => {
+//     e.preventDefault();
+//     onSubmit({
+//       question,
+//       options,
+//       correct_answer: correctAnswer,
+//       difficulty,
+//       category,
+//     });
+//   };
+
+//   return (
+//     <form onSubmit={handleSubmit} className="space-y-4">
+//       <div>
+//         <label className="block text-sm font-medium text-gray-700">Question</label>
+//         <textarea
+//           value={question}
+//           onChange={(e) => setQuestion(e.target.value)}
+//           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//           rows={3}
+//           required
+//         />
+//       </div>
+
+//       <div>
+//         <label className="block text-sm font-medium text-gray-700">Options</label>
+//         {options.map((option, index) => (
+//           <input
+//             key={index}
+//             type="text"
+//             value={option}
+//             onChange={(e) => {
+//               const newOptions = [...options];
+//               newOptions[index] = e.target.value;
+//               setOptions(newOptions);
+//             }}
+//             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//             placeholder={`Option ${index + 1}`}
+//             required
+//           />
+//         ))}
+//       </div>
+
+//       <div>
+//         <label className="block text-sm font-medium text-gray-700">Correct Answer</label>
+//         <select
+//           value={correctAnswer}
+//           onChange={(e) => setCorrectAnswer(e.target.value)}
+//           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//           required
+//         >
+//           <option value="">Select correct answer</option>
+//           {options.map((option, index) => (
+//             <option key={index} value={option}>
+//               {option}
+//             </option>
+//           ))}
+//         </select>
+//       </div>
+
+//       <div>
+//         <label className="block text-sm font-medium text-gray-700">Difficulty</label>
+//         <select
+//           value={difficulty}
+//           onChange={(e) => setDifficulty(e.target.value as 'easy' | 'medium' | 'hard')}
+//           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//           required
+//         >
+//           <option value="easy">Easy</option>
+//           <option value="medium">Medium</option>
+//           <option value="hard">Hard</option>
+//         </select>
+//       </div>
+
+//       <div>
+//         <label className="block text-sm font-medium text-gray-700">Category</label>
+//         <input
+//           type="text"
+//           value={category}
+//           onChange={(e) => setCategory(e.target.value)}
+//           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//           required
+//         />
+//       </div>
+
+//       <button
+//         type="submit"
+//         className="w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+//       >
+//         {initialData ? 'Update Question' : 'Add Question'}
+//       </button>
+//     </form>
+//   );
+// }
+
+// function Questions() {
+//   const [questions, setQuestions] = useState<Question[]>([]);
+//   const [showForm, setShowForm] = useState(false);
+//   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+//   const user = useAuthStore((state) => state.user);
+
+//   useEffect(() => {
+//     loadQuestions();
+//   }, []);
+
+//   const fetchUser = async () => {
+//     const { data, error } = await supabase.auth.getUser();
+
+//     if (error) {
+//       console.error("Error fetching user:", error);
+//     } else {
+//       console.log("Auth UID:", data?.user?.id);
+//     }
+//   };
+//   fetchUser();
+
+
+//   const loadQuestions = async () => {
+//     console.log("loading questions..");
+//     const { data, error } = await supabase
+//       .from('questions')
+//       .select('*')
+//       .order('created_at', { ascending: false });
+    
+//     if (error) {
+//       console.log("error fetching questions", error);
+//       alert("an error occured while fetching questions");
+//     }
+//     else{
+//        console.log("Fetched Questions:", data);
+//        setQuestions(data || []);
+//     }
+//   };
+
+//   const handleSubmit = async (data: any) => {
+//     if (editingQuestion) {
+//       await supabase
+//         .from('questions')
+//         .update(data)
+//         .eq('id', editingQuestion.id);
+//     } else {
+//       await supabase
+//         .from('questions')
+//         .insert([{ ...data, created_by: user?.id }]);
+//     }
+    
+//     setShowForm(false);
+//     setEditingQuestion(null);
+//     loadQuestions();
+//   };
+
+//   const handleEdit = (question: Question) => {
+//     setEditingQuestion(question);
+//     setShowForm(true);
+//   };
+
+//   const handleDelete = async (id: string) => {
+//     console.log(`Attempting to delete question with ID: ${id}`); // Log the ID
+
+//     const confirmDelete = window.confirm(
+//       "Are you sure you want to delete this question?"
+//     );
+//     if (confirmDelete) {
+//       console.log("User confirmed deletion"); // Log confirmation
+
+//       const { error } = await supabase.from("questions").delete().eq("id", id);
+
+//       if (error) {
+//         console.error("Error deleting question:", error);
+//         alert("An error occurred while deleting the question.");
+//       } else {
+//         console.log("Question deleted successfully");
+//         loadQuestions();
+//       }
+//     } else {
+//       console.log("User canceled deletion"); // Log cancellation
+//     }
+//   };
+
+
+//   // console.log("Auth UID:", supabase.auth.getUser());
+
+//   return (
+//     <div className="p-6">
+//       <div className="flex justify-between items-center mb-6">
+//         <h2 className="text-2xl font-bold text-gray-900">Questions</h2>
+//         <button
+//           onClick={() => {
+//             setEditingQuestion(null);
+//             setShowForm(!showForm);
+//           }}
+//           className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+//         >
+//           <Plus className="w-5 h-5" />
+//           Add Question
+//         </button>
+//       </div>
+
+//       {showForm && (
+//         <div className="mb-6 bg-white p-6 rounded-lg shadow">
+//           <QuestionForm onSubmit={handleSubmit} initialData={editingQuestion} />
+//         </div>
+//       )}
+
+//       <div className="grid gap-4">
+//         {questions.map((question) => (
+//           <div key={question.id} className="bg-white p-4 rounded-lg shadow">
+//             <div className="flex justify-between items-start">
+//               <h3 className="text-lg font-medium text-gray-900">{question.question}</h3>
+//               <div className="flex items-center gap-2">
+//                 <span className={`px-2 py-1 rounded text-sm ${
+//                   question.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
+//                   question.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+//                   'bg-red-100 text-red-800'
+//                 }`}>
+//                   {question.difficulty}
+//                 </span>
+//                 <button
+//                   onClick={() => handleEdit(question)}
+//                   className="text-blue-600 hover:text-blue-800"
+//                 >
+//                   Edit
+//                 </button>
+//                 <button
+//                   onClick={() => handleDelete(question.id)}
+//                   className="text-red-600 hover:text-red-800"
+//                 >
+//                   Delete
+//                 </button>
+//               </div>
+//             </div>
+//             <div className="mt-2 space-y-2">
+//               {question.options.map((option, index) => (
+//                 <div
+//                   key={index}
+//                   className={`p-2 rounded ${
+//                     option === question.correct_answer
+//                       ? 'bg-green-100 text-green-800'
+//                       : 'bg-gray-50'
+//                   }`}
+//                 >
+//                   {option}
+//                 </div>
+//               ))}
+//             </div>
+//             <div className="mt-2 text-sm text-gray-500">
+//               Subject: {question.category}
+//             </div>
+//           </div>
+//         ))}
+//       </div>
+//     </div>
+//   );
+// }
+
 function CreateQuiz() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [timeLimit, setTimeLimit] = useState(30);
   const [numQuestions, setNumQuestions] = useState(10);
-  // const [availableCategories, setAvailableCategories] = useState<string[]>([]);
 const [categories, setCategories] = useState<string[]>([]);
 const [category, setCategory] = useState("");
   const [loading, setLoading] = useState(false);
@@ -696,22 +1241,38 @@ const [category, setCategory] = useState("");
     }
   };
 
+// useEffect(() => {
+//   const fetchCategories = async () => {
+//     const { data, error } = await supabase
+//       .from("questions")
+//       .select("category", { distinct: true }); // Fetch unique categories
+
+//     if (error) {
+//       console.error("Error fetching categories:", error);
+//     } else {
+//       const uniqueCategories = [...new Set(data.map((q) => q.category))]; // Ensure uniqueness
+//       setCategories(uniqueCategories);
+//     }
+//   };
+
+//   fetchCategories();
+// }, []);
 useEffect(() => {
-  const fetchCategories = async () => {
-    const { data, error } = await supabase
-      .from("questions")
-      .select("category", { distinct: true }); // Fetch unique categories
+  const fetchSubjects = async () => {
+    const { data, error } = await supabase.from("classes").select("name");
 
     if (error) {
-      console.error("Error fetching categories:", error);
-    } else {
-      const uniqueCategories = [...new Set(data.map((q) => q.category))]; // Ensure uniqueness
-      setCategories(uniqueCategories);
+      console.error("Error fetching class titles:", error);
+    } else if (data) {
+      // Map through the fetched data to extract class titles
+      const classTitles = data.map((cls) => cls.name);
+      setCategories(classTitles); // You can rename setCategories to setSubjects if preferred
     }
   };
 
-  fetchCategories();
+  fetchSubjects();
 }, []);
+
 
   return (
     <div className="p-6">
@@ -756,7 +1317,7 @@ useEffect(() => {
             onChange={(e) => setCategory(e.target.value)}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
           >
-            <option value="">Select a category</option>
+            <option value="">Select a subject</option>
             {categories.map((cat) => (
               <option key={cat} value={cat}>
                 {cat}
@@ -826,10 +1387,13 @@ useEffect(() => {
 function QuizList() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
-    loadQuizzes();
-  }, []);
+    if(user){
+      loadQuizzes();
+    }
+  }, [user]);
 
   const loadQuizzes = async () => {
     const { data } = await supabase
@@ -937,8 +1501,9 @@ export default function TeacherDashboard() {
       <Sidebar />
       <div className="flex-1">
         <Routes>
-          <Route path="/teacher/classes" element={<TeacherClasses />} />
-          <Route path="/" element={<Questions />} />
+          <Route path="/" element={<Navigate to="/teacher/classes" replace />}/>
+          <Route path="/classes" element={<Classes />} />
+          <Route path="/classes/:classId" element={<ClassQuestions />} />
           <Route path="/quizzes" element={<QuizList />} />
           <Route path="/quizzes/create" element={<CreateQuiz />} />
           <Route path="/stats" element={<Statistics />} />
