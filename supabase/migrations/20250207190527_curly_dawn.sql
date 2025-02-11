@@ -60,6 +60,14 @@ CREATE POLICY "Teachers can update their own classes"
     )
   );
 
+  ALTER TABLE questions
+DROP CONSTRAINT IF EXISTS questions_class_id_fkey;
+
+ALTER TABLE questions 
+ADD CONSTRAINT questions_class_id_fkey 
+FOREIGN KEY (class_id) REFERENCES classes(id)
+ON DELETE CASCADE;
+
 CREATE POLICY "Teachers can view their own classes"
   ON classes FOR SELECT
   TO authenticated

@@ -40,26 +40,13 @@ function Sidebar() {
       </div>
       <nav className="mt-8">
         <Link
-          to="/student"
-          className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600"
-        >
-          <Book className="w-5 h-5" />
-          Available Quizzes
-        </Link>
-        <Link
-          to="/student/history"
-          className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600"
-        >
-          <Award className="w-5 h-5" />
-          My Results
-        </Link>
-        <Link
           to="/student/join"
           className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600"
         >
           <UserPlus className="w-5 h-5" />
           Join Class
         </Link>
+
         <Link
           to="/student/my-classes"
           className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600"
@@ -67,6 +54,15 @@ function Sidebar() {
           <User className="w-5 h-5" />
           My Classes
         </Link>
+
+        <Link
+          to="/student/history"
+          className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600"
+        >
+          <Award className="w-5 h-5" />
+          My Results
+        </Link>
+
         <button
           onClick={handleLogout}
           className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600 w-full text-left"
@@ -398,6 +394,194 @@ function ClassDetails() {
 //   );
 // }
 
+// function TakeQuiz() {
+//   const { quizId } = useParams();
+//   const [quiz, setQuiz] = useState<Quiz | null>(null);
+//   const [questions, setQuestions] = useState<Question[]>([]);
+//   const [currentQuestion, setCurrentQuestion] = useState(0);
+//   const [answers, setAnswers] = useState<Record<string, string>>({});
+//   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+//   const [hasAttempted, setHasAttempted] = useState(false);
+//   const navigate = useNavigate();
+//   const user = useAuthStore((state) => state.user);
+
+//   useEffect(() => {
+//     if (quizId && user) {
+//       checkPreviousAttempt();
+//       loadQuiz();
+//     }
+//   }, [quizId, user]);
+
+//   useEffect(() => {
+//     if (timeLeft === 0) {
+//       handleSubmit();
+//     }
+
+//     if (!timeLeft) return;
+
+//     const timer = setInterval(() => {
+//       setTimeLeft(timeLeft - 1);
+//     }, 1000);
+
+//     return () => clearInterval(timer);
+//   }, [timeLeft]);
+
+//   const checkPreviousAttempt = async () => {
+//     if (!user || !quizId) return;
+
+//     const { data } = await supabase
+//       .from('quiz_attempts')
+//       .select('id')
+//       .eq('quiz_id', quizId)
+//       .eq('user_id', user.id)
+//       .single();
+
+//     if (data) {
+//       setHasAttempted(true);
+//       navigate('/student');
+//     }
+//   };
+
+//   const loadQuiz = async () => {
+//     const { data: quizData} = await supabase
+//       .from('quizzes')
+//       .select('*')
+//       .eq('id', quizId)
+//       .single();
+
+//     if (quizData) {
+//       setQuiz(quizData);
+//       setTimeLeft(quizData.time_limit * 60);
+
+//       const { data: questionData } = await supabase
+//         .from('questions')
+//         .select('id, question, options, correct_answer')
+//         .in('id', quizData.questions);
+
+//       if (questionData) {
+//         setQuestions(questionData);
+//       }
+//     }
+//   };
+
+//   const handleAnswer = (answer: string) => {
+//     setAnswers({
+//       ...answers,
+//       [questions[currentQuestion].id]: answer,
+//     });
+//   };
+
+//   const handleSubmit = async () => {
+//     if (!quiz || !user) return;
+
+//     let score = 0;
+//     questions.forEach((question) => {
+//       if (answers[question.id] === question.correct_answer) {
+//         score++;
+//       }
+//     });
+
+//     const finalScore = Math.round((score / questions.length) * 100);
+
+//     try {
+//       const { error } = await supabase
+//         .from('quiz_attempts')
+//         .insert([{
+//           quiz_id: quiz.id,
+//           user_id: user.id,
+//           score: finalScore,
+//           answers,
+//         }]);
+
+//       if (error) throw error;
+//       navigate('/student/history');
+//     } catch (error) {
+//       console.error('Error submitting quiz:', error);
+//       alert('Failed to submit quiz. Please try again.');
+//     }
+//   };
+
+//   if (hasAttempted) {
+//     return null;
+//   }
+
+//   if (!quiz || !questions.length) return null;
+
+//   const question = questions[currentQuestion];
+//   const minutes = Math.floor((timeLeft || 0) / 60);
+//   const seconds = (timeLeft || 0) % 60;
+
+//   return (
+//     <div className="p-6 max-w-3xl mx-auto">
+//       <div className="bg-white rounded-lg shadow-lg p-6">
+//         <div className="flex justify-between items-center mb-6">
+//           <h2 className="text-2xl font-bold text-gray-900">{quiz.title}</h2>
+//           <div className="flex items-center gap-2 text-purple-600">
+//             <Clock className="w-5 h-5" />
+//             {minutes}:{seconds.toString().padStart(2, '0')}
+//           </div>
+//         </div>
+
+//         <div className="mb-6">
+//          <div className="text-sm text-gray-500 mb-2">
+//            Question {currentQuestion + 1} of {questions.length}
+//            </div>
+//           <div className="w-full bg-gray-200 rounded-full h-2">
+//                          <div
+//               className="bg-purple-600 rounded-full h-2"
+//               style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
+//             />
+//           </div>
+//         </div>
+
+//         <h3 className="text-lg font-medium text-gray-900 mb-4">{question.question}</h3>
+
+//         <div className="space-y-3">
+//           {question.options.map((option, index) => (
+//             <button
+//               key={index}
+//               onClick={() => handleAnswer(option)}
+//               className={`w-full p-3 text-left rounded-lg border ${
+//                 answers[question.id] === option
+//                   ? 'border-purple-600 bg-purple-50'
+//                   : 'border-gray-300 hover:border-purple-600'
+//               }`}
+//             >
+//               {option}
+//             </button>
+//           ))}
+//         </div>
+
+//         <div className="mt-6 flex justify-between">
+//           <button
+//             onClick={() => setCurrentQuestion(currentQuestion - 1)}
+//             disabled={currentQuestion === 0}
+//             className="px-4 py-2 text-purple-600 disabled:text-gray-400"
+//           >
+//             Previous
+//           </button>
+//           {currentQuestion === questions.length - 1 ? (
+//             <button
+//               onClick={handleSubmit}
+//               className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700"
+//             >
+//               Submit
+//             </button>
+//           ) : (
+//             <button
+//               onClick={() => setCurrentQuestion(currentQuestion + 1)}
+//               disabled={!answers[question.id]}
+//               className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400"
+//             >
+//               Next
+//             </button>
+//           )}
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+
 function TakeQuiz() {
   const { quizId } = useParams();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -421,10 +605,10 @@ function TakeQuiz() {
       handleSubmit();
     }
 
-    if (!timeLeft) return;
+    if (timeLeft === null) return;
 
     const timer = setInterval(() => {
-      setTimeLeft(timeLeft - 1);
+      setTimeLeft((prev) => (prev !== null ? prev - 1 : null));
     }, 1000);
 
     return () => clearInterval(timer);
@@ -434,23 +618,23 @@ function TakeQuiz() {
     if (!user || !quizId) return;
 
     const { data } = await supabase
-      .from('quiz_attempts')
-      .select('id')
-      .eq('quiz_id', quizId)
-      .eq('user_id', user.id)
+      .from("quiz_attempts")
+      .select("id")
+      .eq("quiz_id", quizId)
+      .eq("user_id", user.id)
       .single();
 
     if (data) {
+      // Instead of navigating away, just set the flag
       setHasAttempted(true);
-      navigate('/student');
     }
   };
 
   const loadQuiz = async () => {
-    const { data: quizData} = await supabase
-      .from('quizzes')
-      .select('*')
-      .eq('id', quizId)
+    const { data: quizData } = await supabase
+      .from("quizzes")
+      .select("*")
+      .eq("id", quizId)
       .single();
 
     if (quizData) {
@@ -458,9 +642,9 @@ function TakeQuiz() {
       setTimeLeft(quizData.time_limit * 60);
 
       const { data: questionData } = await supabase
-        .from('questions')
-        .select('id, question, options, correct_answer')
-        .in('id', quizData.questions);
+        .from("questions")
+        .select("id, question, options, correct_answer")
+        .in("id", quizData.questions);
 
       if (questionData) {
         setQuestions(questionData);
@@ -488,28 +672,35 @@ function TakeQuiz() {
     const finalScore = Math.round((score / questions.length) * 100);
 
     try {
-      const { error } = await supabase
-        .from('quiz_attempts')
-        .insert([{
+      const { error } = await supabase.from("quiz_attempts").insert([
+        {
           quiz_id: quiz.id,
           user_id: user.id,
           score: finalScore,
           answers,
-        }]);
+        },
+      ]);
 
       if (error) throw error;
-      navigate('/student/history');
+      navigate("/student/history");
     } catch (error) {
-      console.error('Error submitting quiz:', error);
-      alert('Failed to submit quiz. Please try again.');
+      console.error("Error submitting quiz:", error);
+      alert("Failed to submit quiz. Please try again.");
     }
   };
 
+  // If the student has already attempted, display a message.
   if (hasAttempted) {
-    return null;
+    return (
+      <div className="p-6 text-center">
+        <p className="text-xl font-bold text-gray-800">
+          You have already attempted this quiz.
+        </p>
+      </div>
+    );
   }
 
-  if (!quiz || !questions.length) return null;
+  if (!quiz || questions.length === 0) return null;
 
   const question = questions[currentQuestion];
   const minutes = Math.floor((timeLeft || 0) / 60);
@@ -522,23 +713,27 @@ function TakeQuiz() {
           <h2 className="text-2xl font-bold text-gray-900">{quiz.title}</h2>
           <div className="flex items-center gap-2 text-purple-600">
             <Clock className="w-5 h-5" />
-            {minutes}:{seconds.toString().padStart(2, '0')}
+            {minutes}:{seconds.toString().padStart(2, "0")}
           </div>
         </div>
 
         <div className="mb-6">
-         <div className="text-sm text-gray-500 mb-2">
-           Question {currentQuestion + 1} of {questions.length}
-           </div>
+          <div className="text-sm text-gray-500 mb-2">
+            Question {currentQuestion + 1} of {questions.length}
+          </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
-                         <div
+            <div
               className="bg-purple-600 rounded-full h-2"
-              style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
+              style={{
+                width: `${((currentQuestion + 1) / questions.length) * 100}%`,
+              }}
             />
           </div>
         </div>
 
-        <h3 className="text-lg font-medium text-gray-900 mb-4">{question.question}</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">
+          {question.question}
+        </h3>
 
         <div className="space-y-3">
           {question.options.map((option, index) => (
@@ -547,8 +742,8 @@ function TakeQuiz() {
               onClick={() => handleAnswer(option)}
               className={`w-full p-3 text-left rounded-lg border ${
                 answers[question.id] === option
-                  ? 'border-purple-600 bg-purple-50'
-                  : 'border-gray-300 hover:border-purple-600'
+                  ? "border-purple-600 bg-purple-50"
+                  : "border-gray-300 hover:border-purple-600"
               }`}
             >
               {option}
@@ -585,6 +780,8 @@ function TakeQuiz() {
     </div>
   );
 }
+
+
 function QuizHistory() {
   const [attempts, setAttempts] = useState([]);
   const [selectedAttempt, setSelectedAttempt] = useState(null);

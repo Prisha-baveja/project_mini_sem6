@@ -45,6 +45,8 @@ FOREIGN KEY (quiz_id)
 REFERENCES quizzes (id)
 ON DELETE CASCADE;
 
+ALTER TABLE quizzes
+ADD COLUMN category TEXT;
 
 -- Enable RLS
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
