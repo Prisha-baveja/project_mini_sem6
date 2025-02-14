@@ -237,357 +237,13 @@ function ClassDetails() {
   );
 }
 
-// function MyClasses() {
-//   const [myClasses, setMyClasses] = useState([]);
-//   const [loading, setLoading] = useState(true);
-//   const [error, setError] = useState("");
-//   const user = useAuthStore((state) => state.user);
-
-//   useEffect(() => {
-//     if (user) {
-//       fetchMyClasses();
-//     }
-//   }, [user]);
-
-//   const fetchMyClasses = async () => {
-//     setLoading(true);
-//     setError("");
-//     try {
-//       // Query the class_members table, and join the classes table
-//       const { data, error } = await supabase
-//         .from("class_members")
-//         .select("*, classes(*)")
-//         .eq("student_id", user.id);
-
-//       if (error) throw error;
-//       setMyClasses(data);
-//     } catch (err) {
-//       console.error("Error fetching my classes:", err);
-//       setError("Failed to load your classes. Please try again.");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   if (loading) {
-//     return <div className="p-6">Loading...</div>;
-//   }
-
-//   if (error) {
-//     return <div className="p-6 text-red-600">{error}</div>;
-//   }
-
-//   return (
-//     <div className="p-6">
-//       <h2 className="text-2xl font-bold text-gray-900 mb-6">My Classes</h2>
-//       {myClasses.length === 0 ? (
-//         <div>You haven't joined any classes yet.</div>
-//       ) : (
-//         <div className="grid gap-4">
-//           {myClasses.map((membership) => {
-//             // membership.classes contains the details from the joined classes table
-//             const joinedClass = membership.classes;
-//             return (
-//               <div
-//                 key={membership.id}
-//                 className="bg-white p-4 rounded-lg shadow"
-//               >
-//                 <h3 className="text-lg font-medium text-gray-900">
-//                   {joinedClass.name}
-//                 </h3>
-//                 <p className="text-gray-500">{joinedClass.description}</p>
-//                 <Link
-//                   to={`/student/class/${joinedClass.id}`}
-//                   className="mt-2 inline-block bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
-//                 >
-//                   View Class
-//                 </Link>
-//               </div>
-//             );
-//           })}
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
-// function QuizList() {
-//   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-//   const [attemptedQuizzes, setAttemptedQuizzes] = useState<Set<string>>(new Set());
-//   const navigate = useNavigate();
-//   const user = useAuthStore((state) => state.user);
-
-//   useEffect(() => {
-//     if (user) {
-//       loadQuizzes();
-//       loadAttemptedQuizzes();
-//     }
-//   }, [user]);
-
-//   const loadQuizzes = async () => {
-//     const { data } = await supabase
-//       .from("quizzes")
-//       .select('*')
-//     .order("created_at", { ascending: false });
-
-//     console.log("load quizzz data",data);
-    
-//     if (data) {
-//       setQuizzes(data);
-//     }
-//   };
-
-//   console.log("quizzes ",quizzes);
-
-//   const loadAttemptedQuizzes = async () => {
-//     if (!user) return;
-
-//     const { data } = await supabase
-//       .from("quiz_attempts")
-//       .select("quiz_id")
-//       .eq("user_id", user.id);
-
-//       console.log("load quizzz attempted", data);
-
-
-//     if (data) {
-//       setAttemptedQuizzes(new Set(data.map((attempt) => attempt.quiz_id)));
-//     }
-//   };
-
-//   return (
-//     <div className="p-6">
-//       <h2 className="text-2xl font-bold text-gray-900 mb-6">Available Quizzes</h2>
-//       <div className="grid gap-4">
-//         {quizzes.map((quiz) => {
-//           const hasAttempted = attemptedQuizzes.has(quiz.id);
-          
-//           return (
-//             <div key={quiz.id} className="bg-white p-4 rounded-lg shadow">
-//               <div className="flex justify-between items-start">
-//                 <div>
-//                   <h3 className="text-lg font-medium text-gray-900">{quiz.title}</h3>
-//                   <p className="text-gray-500">{quiz.description}</p>
-//                 </div>
-//               </div>
-//               <div className="mt-2 text-sm text-gray-500">
-//                 Time limit: {quiz.time_limit} minutes
-//               </div>
-//               {hasAttempted ? (
-//                 <div className="mt-4 flex items-center gap-2 text-purple-600">
-//                   <AlertCircle className="w-5 h-5" />
-//                   <span>You have already attempted this quiz</span>
-//                 </div>
-//               ) : (
-//                 <button
-//               onClick={() => navigate(`/student/quiz/${quiz.id}`)}
-//               className="mt-4 w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700"
-//             >
-//               Start Quiz
-//             </button>
-//               )}
-//             </div>
-//           );
-//         })}
-//       </div>
-//     </div>
-//   );
-// }
-
-// function TakeQuiz() {
-//   const { quizId } = useParams();
-//   const [quiz, setQuiz] = useState<Quiz | null>(null);
-//   const [questions, setQuestions] = useState<Question[]>([]);
-//   const [currentQuestion, setCurrentQuestion] = useState(0);
-//   const [answers, setAnswers] = useState<Record<string, string>>({});
-//   const [timeLeft, setTimeLeft] = useState<number | null>(null);
-//   const [hasAttempted, setHasAttempted] = useState(false);
-//   const navigate = useNavigate();
-//   const user = useAuthStore((state) => state.user);
-
-//   useEffect(() => {
-//     if (quizId && user) {
-//       checkPreviousAttempt();
-//       loadQuiz();
-//     }
-//   }, [quizId, user]);
-
-//   useEffect(() => {
-//     if (timeLeft === 0) {
-//       handleSubmit();
-//     }
-
-//     if (!timeLeft) return;
-
-//     const timer = setInterval(() => {
-//       setTimeLeft(timeLeft - 1);
-//     }, 1000);
-
-//     return () => clearInterval(timer);
-//   }, [timeLeft]);
-
-//   const checkPreviousAttempt = async () => {
-//     if (!user || !quizId) return;
-
-//     const { data } = await supabase
-//       .from('quiz_attempts')
-//       .select('id')
-//       .eq('quiz_id', quizId)
-//       .eq('user_id', user.id)
-//       .single();
-
-//     if (data) {
-//       setHasAttempted(true);
-//       navigate('/student');
-//     }
-//   };
-
-//   const loadQuiz = async () => {
-//     const { data: quizData} = await supabase
-//       .from('quizzes')
-//       .select('*')
-//       .eq('id', quizId)
-//       .single();
-
-//     if (quizData) {
-//       setQuiz(quizData);
-//       setTimeLeft(quizData.time_limit * 60);
-
-//       const { data: questionData } = await supabase
-//         .from('questions')
-//         .select('id, question, options, correct_answer')
-//         .in('id', quizData.questions);
-
-//       if (questionData) {
-//         setQuestions(questionData);
-//       }
-//     }
-//   };
-
-//   const handleAnswer = (answer: string) => {
-//     setAnswers({
-//       ...answers,
-//       [questions[currentQuestion].id]: answer,
-//     });
-//   };
-
-//   const handleSubmit = async () => {
-//     if (!quiz || !user) return;
-
-//     let score = 0;
-//     questions.forEach((question) => {
-//       if (answers[question.id] === question.correct_answer) {
-//         score++;
-//       }
-//     });
-
-//     const finalScore = Math.round((score / questions.length) * 100);
-
-//     try {
-//       const { error } = await supabase
-//         .from('quiz_attempts')
-//         .insert([{
-//           quiz_id: quiz.id,
-//           user_id: user.id,
-//           score: finalScore,
-//           answers,
-//         }]);
-
-//       if (error) throw error;
-//       navigate('/student/history');
-//     } catch (error) {
-//       console.error('Error submitting quiz:', error);
-//       alert('Failed to submit quiz. Please try again.');
-//     }
-//   };
-
-//   if (hasAttempted) {
-//     return null;
-//   }
-
-//   if (!quiz || !questions.length) return null;
-
-//   const question = questions[currentQuestion];
-//   const minutes = Math.floor((timeLeft || 0) / 60);
-//   const seconds = (timeLeft || 0) % 60;
-
-//   return (
-//     <div className="p-6 max-w-3xl mx-auto">
-//       <div className="bg-white rounded-lg shadow-lg p-6">
-//         <div className="flex justify-between items-center mb-6">
-//           <h2 className="text-2xl font-bold text-gray-900">{quiz.title}</h2>
-//           <div className="flex items-center gap-2 text-purple-600">
-//             <Clock className="w-5 h-5" />
-//             {minutes}:{seconds.toString().padStart(2, '0')}
-//           </div>
-//         </div>
-
-//         <div className="mb-6">
-//          <div className="text-sm text-gray-500 mb-2">
-//            Question {currentQuestion + 1} of {questions.length}
-//            </div>
-//           <div className="w-full bg-gray-200 rounded-full h-2">
-//                          <div
-//               className="bg-purple-600 rounded-full h-2"
-//               style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
-//             />
-//           </div>
-//         </div>
-
-//         <h3 className="text-lg font-medium text-gray-900 mb-4">{question.question}</h3>
-
-//         <div className="space-y-3">
-//           {question.options.map((option, index) => (
-//             <button
-//               key={index}
-//               onClick={() => handleAnswer(option)}
-//               className={`w-full p-3 text-left rounded-lg border ${
-//                 answers[question.id] === option
-//                   ? 'border-purple-600 bg-purple-50'
-//                   : 'border-gray-300 hover:border-purple-600'
-//               }`}
-//             >
-//               {option}
-//             </button>
-//           ))}
-//         </div>
-
-//         <div className="mt-6 flex justify-between">
-//           <button
-//             onClick={() => setCurrentQuestion(currentQuestion - 1)}
-//             disabled={currentQuestion === 0}
-//             className="px-4 py-2 text-purple-600 disabled:text-gray-400"
-//           >
-//             Previous
-//           </button>
-//           {currentQuestion === questions.length - 1 ? (
-//             <button
-//               onClick={handleSubmit}
-//               className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700"
-//             >
-//               Submit
-//             </button>
-//           ) : (
-//             <button
-//               onClick={() => setCurrentQuestion(currentQuestion + 1)}
-//               disabled={!answers[question.id]}
-//               className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400"
-//             >
-//               Next
-//             </button>
-//           )}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
 function TakeQuiz() {
-  const { quizId } = useParams();
+  const { quizId } = useParams<{ quizId: string }>();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  // Store answers as an array of strings per question
+  const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [hasAttempted, setHasAttempted] = useState(false);
   const navigate = useNavigate();
@@ -600,72 +256,128 @@ function TakeQuiz() {
     }
   }, [quizId, user]);
 
-  useEffect(() => {
-    if (timeLeft === 0) {
-      handleSubmit();
-    }
-
-    if (timeLeft === null) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => (prev !== null ? prev - 1 : null));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [timeLeft]);
-
   const checkPreviousAttempt = async () => {
     if (!user || !quizId) return;
-
-    const { data } = await supabase
-      .from("quiz_attempts")
-      .select("id")
-      .eq("quiz_id", quizId)
-      .eq("user_id", user.id)
-      .single();
-
-    if (data) {
-      // Instead of navigating away, just set the flag
-      setHasAttempted(true);
+    try {
+      const { data, error } = await supabase
+        .from("quiz_attempts")
+        .select("id")
+        .eq("quiz_id", quizId)
+        .eq("user_id", user.id)
+        .single();
+      if (data) {
+        setHasAttempted(true);
+      }
+      if (error && error.code !== "PGRST116") {
+        console.error("Error checking quiz attempt:", error);
+      }
+    } catch (err) {
+      console.error("Error in checkPreviousAttempt:", err);
     }
   };
 
   const loadQuiz = async () => {
-    const { data: quizData } = await supabase
-      .from("quizzes")
-      .select("*")
-      .eq("id", quizId)
-      .single();
+    try {
+      const { data: quizData } = await supabase
+        .from("quizzes")
+        .select("*")
+        .eq("id", quizId)
+        .single();
 
-    if (quizData) {
-      setQuiz(quizData);
-      setTimeLeft(quizData.time_limit * 60);
+      if (quizData) {
+        setQuiz(quizData);
+        // Set initial timer value in seconds
+        setTimeLeft(quizData.time_limit * 60);
 
-      const { data: questionData } = await supabase
-        .from("questions")
-        .select("id, question, options, correct_answer")
-        .in("id", quizData.questions);
+        // Include questionType and marks along with other fields
+        const { data: questionData } = await supabase
+          .from("questions")
+          .select("id, question, options, correct_answer, questionType, marks")
+          .in("id", quizData.questions);
 
-      if (questionData) {
-        setQuestions(questionData);
+        if (questionData) {
+          setQuestions(questionData);
+        }
       }
+    } catch (err) {
+      console.error("Error loading quiz:", err);
     }
   };
 
-  const handleAnswer = (answer: string) => {
-    setAnswers({
-      ...answers,
-      [questions[currentQuestion].id]: answer,
-    });
+  // New useEffect to decrement the timer every second once the quiz is loaded.
+  useEffect(() => {
+    if (quiz && timeLeft !== null) {
+      const interval = setInterval(() => {
+        setTimeLeft((prevTime) => {
+          if (prevTime !== null) {
+            if (prevTime <= 1) {
+              clearInterval(interval);
+              // Auto-submit when time runs out
+              handleSubmit();
+              return 0;
+            }
+            return prevTime - 1;
+          }
+          return null;
+        });
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [quiz, timeLeft !== null]);
+
+  const handleAnswer = (option: string) => {
+    const question = questions[currentQuestion];
+    const qid = question.id;
+    const currentAns = answers[qid] || [];
+
+    if (question.questionType === "multiple") {
+      // Toggle the option for multiple-correct questions
+      if (currentAns.includes(option)) {
+        setAnswers({
+          ...answers,
+          [qid]: currentAns.filter((ans) => ans !== option),
+        });
+      } else {
+        setAnswers({
+          ...answers,
+          [qid]: [...currentAns, option],
+        });
+      }
+    } else {
+      // For single correct, replace any previous answer
+      setAnswers({
+        ...answers,
+        [qid]: [option],
+      });
+    }
   };
 
   const handleSubmit = async () => {
+    if (hasAttempted) {
+      alert("You have already attempted this quiz.");
+      return;
+    }
     if (!quiz || !user) return;
 
     let score = 0;
     questions.forEach((question) => {
-      if (answers[question.id] === question.correct_answer) {
-        score++;
+      const given = answers[question.id] || [];
+      if (question.questionType === "multiple") {
+        // Assume correct_answer is an array for multi-correct questions
+        const correct = question.correct_answer; // expected to be an array
+        if (
+          Array.isArray(correct) &&
+          given.length === correct.length &&
+          given.every((ans) => correct.includes(ans))
+        ) {
+          score++;
+        }
+      } else {
+        // For single correct questions, correct_answer is a string
+        if (given[0] === question.correct_answer) {
+          score++;
+        }
       }
     });
 
@@ -677,10 +389,10 @@ function TakeQuiz() {
           quiz_id: quiz.id,
           user_id: user.id,
           score: finalScore,
-          answers,
+          answers, // stores an object mapping question ids to arrays of answers
+          completed_at: new Date(),
         },
       ]);
-
       if (error) throw error;
       navigate("/student/history");
     } catch (error) {
@@ -689,13 +401,21 @@ function TakeQuiz() {
     }
   };
 
-  // If the student has already attempted, display a message.
   if (hasAttempted) {
     return (
-      <div className="p-6 text-center">
-        <p className="text-xl font-bold text-gray-800">
-          You have already attempted this quiz.
-        </p>
+      <div className="p-6 max-w-3xl mx-auto">
+        <div className="bg-red-100 border border-red-300 text-red-800 p-6 rounded-lg text-center">
+          <p className="text-xl font-bold mb-4">
+            You have already attempted this quiz.
+          </p>
+          <p className="mb-6">You cannot attempt it again.</p>
+          <button
+            onClick={() => navigate("/student/history")}
+            className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700"
+          >
+            View Quiz History
+          </button>
+        </div>
       </div>
     );
   }
@@ -731,24 +451,31 @@ function TakeQuiz() {
           </div>
         </div>
 
-        <h3 className="text-lg font-medium text-gray-900 mb-4">
-          {question.question}
-        </h3>
+        <div className="mb-4">
+          <h3 className="text-lg font-medium text-gray-900">
+            {question.question}
+          </h3>
+          <p className="text-sm text-gray-500">Marks: {question.marks}</p>
+          <p className="text-sm text-gray-500">Type: {question.questionType}</p>
+        </div>
 
         <div className="space-y-3">
-          {question.options.map((option, index) => (
-            <button
-              key={index}
-              onClick={() => handleAnswer(option)}
-              className={`w-full p-3 text-left rounded-lg border ${
-                answers[question.id] === option
-                  ? "border-purple-600 bg-purple-50"
-                  : "border-gray-300 hover:border-purple-600"
-              }`}
-            >
-              {option}
-            </button>
-          ))}
+          {question.options.map((option, index) => {
+            const selected = answers[question.id]?.includes(option);
+            return (
+              <button
+                key={index}
+                onClick={() => handleAnswer(option)}
+                className={`w-full p-3 text-left rounded-lg border ${
+                  selected
+                    ? "border-purple-600 bg-purple-50"
+                    : "border-gray-300 hover:border-purple-600"
+                }`}
+              >
+                {option}
+              </button>
+            );
+          })}
         </div>
 
         <div className="mt-6 flex justify-between">
@@ -769,7 +496,9 @@ function TakeQuiz() {
           ) : (
             <button
               onClick={() => setCurrentQuestion(currentQuestion + 1)}
-              disabled={!answers[question.id]}
+              disabled={
+                !answers[question.id] || answers[question.id].length === 0
+              }
               className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400"
             >
               Next
@@ -781,14 +510,12 @@ function TakeQuiz() {
   );
 }
 
-
 function QuizHistory() {
   const [attempts, setAttempts] = useState([]);
   const [selectedAttempt, setSelectedAttempt] = useState(null);
   const [questions, setQuestions] = useState({});
   const user = useAuthStore((state) => state.user);
 
-  // Load attempts (with nested quiz data) and quizzes when the user exists
   useEffect(() => {
     if (user) {
       loadAttempts();
@@ -796,23 +523,19 @@ function QuizHistory() {
     }
   }, [user]);
 
-  // Ensure that you load quiz data as well (if needed)
   const loadQuizzes = async () => {
     const { data, error } = await supabase
       .from("quizzes")
       .select("*")
       .order("created_at", { ascending: false });
     console.log("Loaded quiz data:", data);
-    // Optionally, store quizzes in state if required.
   };
 
-  // Load attempts and include the related quiz record by using a foreign key join
   const loadAttempts = async () => {
     if (!user) return;
     try {
       const { data, error } = await supabase
         .from("quiz_attempts")
-        // Adjust the select so that the related quiz record is fetched.
         .select("*, quiz:quizzes(*)")
         .eq("user_id", user.id)
         .order("completed_at", { ascending: false });
@@ -826,12 +549,11 @@ function QuizHistory() {
     }
   };
 
-  // Load question details for the selected attempt
   const loadQuestionDetails = async (questionIds) => {
     try {
       const { data, error } = await supabase
         .from("questions")
-        .select("id, question, options, correct_answer")
+        .select("id, question, options, correct_answer, questionType")
         .in("id", questionIds);
       if (error) throw error;
       if (data) {
@@ -909,41 +631,105 @@ function QuizHistory() {
               </div>
             </div>
 
-            {/* Render the question details if this attempt is selected */}
             {selectedAttempt?.id === attempt.id &&
               Object.keys(questions).length > 0 && (
                 <div className="mt-4 space-y-4">
                   {attempt.quiz.questions.map((questionId) => {
                     const question = questions[questionId];
                     if (!question) return null;
-                    const userAnswer = attempt.answers[questionId];
-                    const isCorrect = userAnswer === question.correct_answer;
 
+                    // Parse the answers if they are stored as a JSON string.
+                    let answersData = attempt.answers;
+                    if (typeof answersData === "string") {
+                      try {
+                        answersData = JSON.parse(answersData);
+                      } catch (err) {
+                        console.error("Error parsing answers:", err);
+                        answersData = {};
+                      }
+                    }
+                    const userAns = answersData[questionId] || [];
+
+                    // Determine if the question is multi-correct
+                    const isMulti =
+                      question.questionType === "multiple" 
+
+                    // Normalize correct answers once for comparison.
+                    let correctAnswers = [];
+                    if (isMulti) {
+                      correctAnswers = Array.isArray(question.correct_answer)
+                        ? question.correct_answer.map((ans) =>
+                            ans.trim().toLowerCase()
+                          )
+                        : String(question.correct_answer)
+                            .split(",")
+                            .map((ans) => ans.trim().toLowerCase());
+                    } else {
+                      correctAnswers = [
+                        String(question.correct_answer).trim().toLowerCase(),
+                      ];
+                    }
                     return (
                       <div key={questionId} className="border rounded-lg p-4">
                         <p className="font-medium text-gray-900">
                           {question.question}
                         </p>
                         <div className="mt-2 space-y-2">
-                          {question.options.map((option, index) => (
-                            <div
-                              key={index}
-                              className={`p-2 rounded ${
-                                option === question.correct_answer
-                                  ? "bg-green-100 text-green-800"
-                                  : option === userAnswer && !isCorrect
-                                  ? "bg-red-100 text-red-800"
-                                  : "bg-gray-50"
-                              }`}
-                            >
-                              {option}
-                              {option === userAnswer &&
-                                !isCorrect &&
-                                " (Your answer)"}
-                              {option === question.correct_answer &&
-                                " (Correct answer)"}
-                            </div>
-                          ))}
+                          {question.options.map((option, index) => {
+                            // Normalize the option text for consistent comparison.
+                            const normalizedOption = option
+                              .trim()
+                              .toLowerCase();
+
+                            // Ensure that userAns is an array.
+                            const userAnsArray = Array.isArray(userAns)
+                              ? userAns
+                              : [userAns];
+                            const normalizedUserAns = userAnsArray.map((ans) =>
+                              ans.trim().toLowerCase()
+                            );
+
+                            // Check if this option is the correct answer.
+                            const isCorrect =
+                              correctAnswers.includes(normalizedOption);
+                            // Check if the user selected this option.
+                            const isSelected =
+                              normalizedUserAns.includes(normalizedOption);
+
+                            // Set the label based on the selection and correctness.
+                            let label = "";
+                            if (isCorrect) {
+                              label = isSelected
+                                ? " (Your answer)"
+                                : " (Correct answer)";
+                            } else if (isSelected) {
+                              label = " (Your answer)";
+                            }
+
+                            // Determine the background and text colors.
+                            // Always highlight the correct answer in green.
+                            // Highlight user-selected wrong answers in red.
+                            const bgColor = isCorrect
+                              ? "bg-green-100"
+                              : isSelected
+                              ? "bg-red-100"
+                              : "bg-gray-50";
+                            const textColor = isCorrect
+                              ? "text-green-800"
+                              : isSelected
+                              ? "text-red-800"
+                              : "text-gray-700";
+
+                            return (
+                              <div
+                                key={index}
+                                className={`p-2 rounded ${bgColor} ${textColor}`}
+                              >
+                                {option}
+                                {label}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -956,6 +742,7 @@ function QuizHistory() {
     </div>
   );
 }
+
 function JoinClass() {
   const [joinCode, setJoinCode] = useState("");
   const [error, setError] = useState("");
