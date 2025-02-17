@@ -59,12 +59,12 @@ function Sidebar() {
 
   return (
     <div className="bg-white w-64 min-h-screen shadow-lg">
-      <div className="p-4">
+      {/* <div className="p-4">
         <h1 className="text-2xl font-bold text-purple-600 flex items-center gap-2">
           <GraduationCap className="w-6 h-6" />
           QuizDash
         </h1>
-      </div>
+      </div> */}
       <nav className="mt-8">
         <Link
           to="/teacher/classes"
