@@ -2263,7 +2263,6 @@ function CreateQuiz() {
   );
 }
 
-
 function QuizList() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const navigate = useNavigate();
