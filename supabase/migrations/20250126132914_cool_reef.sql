@@ -86,42 +86,10 @@ CREATE POLICY "Everyone can read questions"
   TO authenticated
   USING (true);
 
-  -- CREATE POLICY "Teachers can delete their own questions"
-  -- ON questions FOR DELETE
-  -- TO authenticated
-  -- USING (
-  --   created_by = auth.uid() 
-  --   AND EXISTS (
-  --     SELECT 1 FROM profiles
-  --     WHERE profiles.id = auth.uid()
-  --     AND profiles.role = 'teacher'
-  --   )
-  -- );
-
---   CREATE POLICY "Teachers can delete their own questions"
--- ON questions FOR DELETE
--- TO authenticated
--- USING (
---   created_by = auth.uid()
---   AND (SELECT role FROM profiles WHERE profiles.id = auth.uid()) = 'teacher'
--- );
-
 CREATE POLICY "Teachers can delete their own questions"
   ON questions FOR DELETE
   TO authenticated
   USING (created_by = auth.uid());
-
--- Quizzes policies
--- CREATE POLICY "Teachers can create quizzes"
---   ON quizzes FOR INSERT
---   TO authenticated
---   WITH CHECK (
---     EXISTS (
---       SELECT 1 FROM profiles
---       WHERE profiles.id = auth.uid()
---       AND profiles.role = 'teacher'
---     )
---   );
 
 DROP POLICY IF EXISTS "Teachers can create questions" ON questions;
 CREATE POLICY "Teachers can create questions"
@@ -166,29 +134,6 @@ CREATE POLICY "Teachers can delete their own quizzes"
   ON quizzes FOR DELETE
   TO authenticated
   USING (created_by = auth.uid());
-
-
--- CREATE POLICY "Teachers can delete their own questions"
---   ON questions FOR DELETE
---   TO authenticated
---   USING (
---     true
---   );
-
--- Quiz attempts policies
--- CREATE POLICY "Students can create quiz attempts"
---   ON quiz_attempts FOR INSERT
---   TO authenticated
---   WITH CHECK (EXISTS (
---     SELECT 1 FROM profiles
---     WHERE profiles.id = auth.uid()
---     AND profiles.role = 'student'
---   ));
-
--- CREATE POLICY "Users can read their own quiz attempts"
---   ON quiz_attempts FOR SELECT
---   TO authenticated
---   USING (user_id = auth.uid());
 
 CREATE POLICY "Students can create quiz attempts (once per quiz)"
   ON quiz_attempts FOR INSERT

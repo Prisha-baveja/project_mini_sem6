@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Link, useNavigate, useParams } from "react-router-dom";
-import { GraduationCap,Book,LogOut,Plus,List,BarChart,Users,Award,User } from "lucide-react";
+import {GraduationCap,Book,LogOut,Plus,List,BarChart,Users,Award,User} from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { supabase } from "../lib/supabase";
 import { FaChalkboard } from "react-icons/fa";
@@ -1037,7 +1037,7 @@ function Classes() {
 //                 if (question.questionType === "multiple") {
 //                   // For multiple-answer questions, correct_answer is assumed to be an array.
 //                   isCorrect = question.correct_answer.includes(option);
-//                 } 
+//                 }
 //                 else if (question.questionType === "single") {
 //                   // Check if correct_answer is an array; if not, compare directly.
 //                   if (Array.isArray(question.correct_answer)) {
@@ -1957,21 +1957,29 @@ function ClassQuestions() {
 function CreateQuiz() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">(
-    "medium"
-  );
   const [timeLimit, setTimeLimit] = useState(30);
   const [numQuestions, setNumQuestions] = useState(1);
   const [categories, setCategories] = useState<string[]>([]);
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(""); // The subject/category
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // State for available mark values (e.g., 1, 2, 5) and for the user-specified count per mark.
+  // MARKS: Existing states
   const [markSections, setMarkSections] = useState<number[]>([]);
   const [questionsByMark, setQuestionsByMark] = useState<{
     [key: number]: number;
   }>({});
+
+  // NEW: Difficulty-based question selection
+  const [questionsByDifficulty, setQuestionsByDifficulty] = useState<{
+    easy: number;
+    medium: number;
+    hard: number;
+  }>({
+    easy: 0,
+    medium: 0,
+    hard: 0,
+  });
 
   const user = useAuthStore((state) => state.user);
   const navigate = useNavigate();
@@ -1990,16 +1998,17 @@ function CreateQuiz() {
     fetchSubjects();
   }, []);
 
-  // Fetch distinct mark values from the questions table ensuring uniqueness
+  // Fetch distinct mark values (all classes or per category—up to you)
   useEffect(() => {
     const fetchMarkSections = async () => {
+      // If you only want to show mark values for the currently selected category,
+      // add: .eq("category", category) if your DB has that data.
       const { data, error } = await supabase
         .from("questions")
         .select("marks", { distinct: true });
       if (error) {
         console.error("Error fetching mark sections:", error);
       } else if (data) {
-        // Use a Set to guarantee unique mark values.
         const marksValues = Array.from(new Set(data.map((q) => q.marks)));
         setMarkSections(marksValues);
       }
@@ -2007,7 +2016,7 @@ function CreateQuiz() {
     fetchMarkSections();
   }, []);
 
-  // Initialize questionsByMark mapping when markSections updates.
+  // Initialize questionsByMark mapping
   useEffect(() => {
     if (markSections.length > 0) {
       const mapping: { [key: number]: number } = {};
@@ -2026,114 +2035,150 @@ function CreateQuiz() {
     try {
       // Basic validations
       if (!title.trim()) throw new Error("Title is required");
-      if (timeLimit < 1 || timeLimit > 180)
+      if (timeLimit < 1 || timeLimit > 180) {
         throw new Error("Time limit must be between 1 and 180 minutes");
-      if (numQuestions < 1)
+      }
+      if (numQuestions < 1) {
         throw new Error("Must include at least one question");
-      if (!category) throw new Error("Category selection is important");
+      }
+      if (!category) {
+        throw new Error("Category (subject) is required");
+      }
 
-      // Validate that the total of mark-specific counts does not exceed the overall total.
-      const totalSpecificQuestions = Object.values(questionsByMark).reduce(
+      // Sum up all the specifically requested questions by mark
+      const totalMarkRequests = Object.values(questionsByMark).reduce(
         (sum, count) => sum + count,
         0
       );
-      if (totalSpecificQuestions > numQuestions) {
+
+      // Sum up all the specifically requested questions by difficulty
+      const totalDifficultyRequests =
+        questionsByDifficulty.easy +
+        questionsByDifficulty.medium +
+        questionsByDifficulty.hard;
+
+      // Combined total of "special" requests
+      const combinedSpecialRequests =
+        totalMarkRequests + totalDifficultyRequests;
+
+      if (combinedSpecialRequests > numQuestions) {
         throw new Error(
-          "Total number of specific mark questions exceeds overall number of questions"
+          "You are requesting more special-criteria questions than the total number of questions"
         );
       }
 
-      let specificQuestionIds: number[] = [];
-
-      // For each mark value with a nonzero count, fetch that many questions.
+      // 1) Fetch questions by MARK
+      let specificMarkQuestionIds: number[] = [];
       for (const markStr of Object.keys(questionsByMark)) {
         const mark = Number(markStr);
         const count = questionsByMark[mark];
         if (count > 0) {
+          // Query the DB for that mark, in the selected category
           const { data: markQuestions, error: markQuestionError } =
             await supabase
               .from("questions")
               .select("id")
-              .eq("difficulty", difficulty)
               .eq("category", category)
               .eq("marks", mark);
-          if (markQuestionError)
-            throw new Error(
-              `Failed to fetch questions for ${mark} mark section`
-            );
+
+          if (markQuestionError) {
+            throw new Error(`Failed to fetch questions for ${mark} mark`);
+          }
           if (!markQuestions || markQuestions.length < count) {
             throw new Error(
-              `Not enough questions available for ${mark} mark section`
+              `Not enough questions for ${mark} mark in this subject`
             );
           }
-          const ids = markQuestions.slice(0, count).map((q) => q.id);
-          specificQuestionIds = [...specificQuestionIds, ...ids];
+
+          // Take the first "count" questions or pick them randomly
+          const pickedIds = markQuestions.slice(0, count).map((q) => q.id);
+          specificMarkQuestionIds = [...specificMarkQuestionIds, ...pickedIds];
         }
       }
 
-      // Calculate how many general questions are needed.
-      const remainingQuestionsCount = numQuestions - totalSpecificQuestions;
-      let generalQuestionIds: number[] = [];
-      if (remainingQuestionsCount > 0) {
-        // Build a query for general questions.
-        let generalQuery = supabase
+      // 2) Fetch questions by DIFFICULTY
+      let difficultyQuestionIds: number[] = [];
+      type DiffLevels = "easy" | "medium" | "hard";
+      for (const level of ["easy", "medium", "hard"] as DiffLevels[]) {
+        const count = questionsByDifficulty[level];
+        if (count > 0) {
+          const { data: diffQuestions, error: diffError } = await supabase
+            .from("questions")
+            .select("id")
+            .eq("category", category)
+            .eq("difficulty", level);
+
+          if (diffError) throw new Error(`Failed to fetch ${level} questions`);
+          if (!diffQuestions || diffQuestions.length < count) {
+            throw new Error(
+              `Not enough ${level} questions available in this subject`
+            );
+          }
+
+          const pickedDiffIds = diffQuestions.slice(0, count).map((q) => q.id);
+          difficultyQuestionIds = [...difficultyQuestionIds, ...pickedDiffIds];
+        }
+      }
+
+      // Combine the special criteria IDs
+      let specialIDs = [...specificMarkQuestionIds, ...difficultyQuestionIds];
+
+      // Remove duplicates (if a question meets both mark + difficulty)
+      specialIDs = Array.from(new Set(specialIDs));
+
+      // 3) If there's still room for more questions (numQuestions - specialIDs.length),
+      //    fetch "general" questions that are NOT already used.
+      const stillNeeded = numQuestions - specialIDs.length;
+      let generalIDs: number[] = [];
+      if (stillNeeded > 0) {
+        // For example, fetch any questions in the chosen category that are
+        // not already in specialIDs
+        const { data: generalQuestions, error: generalError } = await supabase
           .from("questions")
           .select("id")
-          .eq("difficulty", difficulty)
-          .eq("category", category);
-        // Exclude questions from the mark values for which the user specified counts.
-        const specificMarks = Object.keys(questionsByMark)
-          .filter((markStr) => questionsByMark[Number(markStr)] > 0)
-          .map((markStr) => Number(markStr));
-        if (specificMarks.length > 0) {
-          generalQuery = generalQuery.not(
-            "marks",
-            "in",
-            `(${specificMarks.join(",")})`
-          );
-        }
-        const { data: generalQuestions, error: generalQuestionError } =
-          await generalQuery;
-        if (generalQuestionError)
-          throw new Error("Failed to fetch general questions");
-        if (
-          !generalQuestions ||
-          generalQuestions.length < remainingQuestionsCount
-        ) {
+          .eq("category", category)
+          // Possibly exclude the difficulties or marks you already used
+          // For example, .not("id","in",`(${specialIDs.join(',')})`) if you want distinct questions.
+          .not("id", "in", `(${specialIDs.join(",")})`);
+
+        if (generalError) throw new Error("Failed to fetch general questions");
+        if (!generalQuestions || generalQuestions.length < stillNeeded) {
           throw new Error(
-            "Not enough general questions available for the selected criteria"
+            "Not enough general questions available for your total question count"
           );
         }
-        generalQuestionIds = generalQuestions
-          .slice(0, remainingQuestionsCount)
+
+        // Take the needed count from the general pool
+        const selectedGeneral = generalQuestions
+          .slice(0, stillNeeded)
           .map((q) => q.id);
+        generalIDs = [...selectedGeneral];
       }
 
-      // Combine all selected question IDs.
-      const finalQuestionIds = [...specificQuestionIds, ...generalQuestionIds];
+      // Final array of question IDs
+      const finalQuestionIds = [...specialIDs, ...generalIDs];
 
-      // Insert the quiz (and optionally store questionsByMark info)
+      // Insert quiz record
       const { error: quizError } = await supabase.from("quizzes").insert([
         {
           title: title.trim(),
           description: description.trim(),
-          difficulty,
           time_limit: timeLimit,
-          questions: finalQuestionIds,
+          questions: finalQuestionIds, // an array of question IDs
           created_by: user?.id,
-          category: category,
-          // Extra field: store the mark-specific question counts if desired
-          // questions_by_mark: questionsByMark,
+          category,
         },
       ]);
+
       if (quizError) {
         console.error("Quiz creation error:", quizError);
         throw new Error("Failed to create quiz");
       }
 
+      // Navigate or do whatever after success
       navigate("/teacher/quizzes");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create quiz");
+    } catch (err: any) {
+      setError(err?.message || "Failed to create quiz");
     } finally {
       setLoading(false);
     }
@@ -2149,6 +2194,7 @@ function CreateQuiz() {
           </div>
         )}
 
+        {/* Title */}
         <div>
           <label className="block text-sm font-medium text-gray-700">
             Title
@@ -2162,6 +2208,7 @@ function CreateQuiz() {
           />
         </div>
 
+        {/* Description */}
         <div>
           <label className="block text-sm font-medium text-gray-700">
             Description
@@ -2174,6 +2221,7 @@ function CreateQuiz() {
           />
         </div>
 
+        {/* Subject / Category */}
         <div>
           <label className="block text-sm font-medium text-gray-700">
             Subject
@@ -2182,6 +2230,7 @@ function CreateQuiz() {
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+            required
           >
             <option value="">Select a subject</option>
             {categories.map((cat) => (
@@ -2192,23 +2241,22 @@ function CreateQuiz() {
           </select>
         </div>
 
+        {/* Time Limit */}
         <div>
           <label className="block text-sm font-medium text-gray-700">
-            Difficulty
+            Time Limit (minutes)
           </label>
-          <select
-            value={difficulty}
-            onChange={(e) =>
-              setDifficulty(e.target.value as "easy" | "medium" | "hard")
-            }
+          <input
+            type="number"
+            value={timeLimit}
+            onChange={(e) => setTimeLimit(parseInt(e.target.value, 10))}
+            min="1"
+            max="180"
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-          >
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-          </select>
+          />
         </div>
 
+        {/* Total number of questions */}
         <div>
           <label className="block text-sm font-medium text-gray-700">
             Total Number of Questions
@@ -2216,13 +2264,14 @@ function CreateQuiz() {
           <input
             type="number"
             value={numQuestions}
-            onChange={(e) => setNumQuestions(parseInt(e.target.value))}
+            onChange={(e) => setNumQuestions(parseInt(e.target.value, 10))}
             min="1"
             max="50"
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
           />
         </div>
 
+        {/* Mark-based question selection */}
         <div>
           <h3 className="text-lg font-semibold text-gray-800">
             Specify Questions by Marks
@@ -2238,7 +2287,7 @@ function CreateQuiz() {
                 onChange={(e) =>
                   setQuestionsByMark({
                     ...questionsByMark,
-                    [mark]: parseInt(e.target.value),
+                    [mark]: parseInt(e.target.value, 10) || 0,
                   })
                 }
                 min="0"
@@ -2249,6 +2298,34 @@ function CreateQuiz() {
           ))}
         </div>
 
+        {/* Difficulty-based question selection */}
+        <div>
+          <h3 className="text-lg font-semibold text-gray-800">
+            Specify Questions by Difficulty
+          </h3>
+          {(["easy", "medium", "hard"] as const).map((level) => (
+            <div key={level}>
+              <label className="block text-sm font-medium text-gray-700">
+                Number of {level} Questions
+              </label>
+              <input
+                type="number"
+                value={questionsByDifficulty[level]}
+                onChange={(e) =>
+                  setQuestionsByDifficulty({
+                    ...questionsByDifficulty,
+                    [level]: parseInt(e.target.value, 10) || 0,
+                  })
+                }
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                min="0"
+                max="50"
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Submit */}
         <button
           type="submit"
           disabled={loading}
@@ -2262,6 +2339,336 @@ function CreateQuiz() {
     </div>
   );
 }
+
+// function CreateQuiz() {
+//   const [title, setTitle] = useState("");
+//   const [description, setDescription] = useState("");
+//   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">(
+//     "medium"
+//   );
+//   const [timeLimit, setTimeLimit] = useState(30);
+//   const [numQuestions, setNumQuestions] = useState(1);
+//   const [categories, setCategories] = useState<string[]>([]);
+//   const [category, setCategory] = useState("");
+//   const [loading, setLoading] = useState(false);
+//   const [error, setError] = useState("");
+
+//   // State for available mark values (e.g., 1, 2, 5) and for the user-specified count per mark.
+//   const [markSections, setMarkSections] = useState<number[]>([]);
+//   const [questionsByMark, setQuestionsByMark] = useState<{
+//     [key: number]: number;
+//   }>({});
+
+  
+
+//   const user = useAuthStore((state) => state.user);
+//   const navigate = useNavigate();
+
+//   // Fetch subjects (categories)
+//   useEffect(() => {
+//     const fetchSubjects = async () => {
+//       const { data, error } = await supabase.from("classes").select("name");
+//       if (error) {
+//         console.error("Error fetching class titles:", error);
+//       } else if (data) {
+//         const classTitles = data.map((cls) => cls.name);
+//         setCategories(classTitles);
+//       }
+//     };
+//     fetchSubjects();
+//   }, []);
+
+//   // Fetch distinct mark values from the questions table ensuring uniqueness
+//   // useEffect(() => {
+//   //   const fetchMarkSections = async () => {
+//   //     const { data, error } = await supabase
+//   //       .from("questions")
+//   //       .select("marks", { distinct: true });
+//   //     if (error) {
+//   //       console.error("Error fetching mark sections:", error);
+//   //     } else if (data) {
+//   //       // Use a Set to guarantee unique mark values.
+//   //       const marksValues = Array.from(new Set(data.map((q) => q.marks)));
+//   //       setMarkSections(marksValues);
+//   //     }
+//   //   };
+//   //   fetchMarkSections();
+//   // }, []);
+
+//   useEffect(() => {
+//   if (!category) return;
+//   const fetchMarkSections = async () => {
+//     const { data, error } = await supabase
+//       .from("questions")
+//       .select("marks", { distinct: true })
+//       .eq("category", category);  // only fetch marks for this category
+
+//     if (error) {
+//       console.error("Error fetching mark sections:", error);
+//     } else if (data) {
+//       // Use a Set to ensure uniqueness
+//       const marksValues = Array.from(new Set(data.map((q) => q.marks)));
+//       setMarkSections(marksValues);
+//     }
+//   };
+//   fetchMarkSections();
+// }, [category]);
+
+//   // Initialize questionsByMark mapping when markSections updates.
+//   useEffect(() => {
+//     if (markSections.length > 0) {
+//       const mapping: { [key: number]: number } = {};
+//       markSections.forEach((mark) => {
+//         mapping[mark] = 0;
+//       });
+//       setQuestionsByMark(mapping);
+//     }
+//   }, [markSections]);
+
+//   const handleSubmit = async (e: React.FormEvent) => {
+//     e.preventDefault();
+//     setError("");
+//     setLoading(true);
+
+//     try {
+//       // Basic validations
+//       if (!title.trim()) throw new Error("Title is required");
+//       if (timeLimit < 1 || timeLimit > 180)
+//         throw new Error("Time limit must be between 1 and 180 minutes");
+//       if (numQuestions < 1)
+//         throw new Error("Must include at least one question");
+//       if (!category) throw new Error("Category selection is important");
+
+//       // Validate that the total of mark-specific counts does not exceed the overall total.
+//       const totalSpecificQuestions = Object.values(questionsByMark).reduce(
+//         (sum, count) => sum + count,
+//         0
+//       );
+//       if (totalSpecificQuestions > numQuestions) {
+//         throw new Error(
+//           "Total number of specific mark questions exceeds overall number of questions"
+//         );
+//       }
+
+//       let specificQuestionIds: number[] = [];
+
+//       // For each mark value with a nonzero count, fetch that many questions.
+//       for (const markStr of Object.keys(questionsByMark)) {
+//         const mark = Number(markStr);
+//         const count = questionsByMark[mark];
+//         if (count > 0) {
+//           const { data: markQuestions, error: markQuestionError } =
+//             await supabase
+//               .from("questions")
+//               .select("id")
+//               .eq("difficulty", difficulty)
+//               .eq("category", category)
+//               .eq("marks", mark);
+//           if (markQuestionError)
+//             throw new Error(
+//               `Failed to fetch questions for ${mark} mark section`
+//             );
+//           if (!markQuestions || markQuestions.length < count) {
+//             throw new Error(
+//               `Not enough questions available for ${mark} mark section`
+//             );
+//           }
+//           const ids = markQuestions.slice(0, count).map((q) => q.id);
+//           specificQuestionIds = [...specificQuestionIds, ...ids];
+//         }
+//       }
+
+//       // Calculate how many general questions are needed.
+//       const remainingQuestionsCount = numQuestions - totalSpecificQuestions;
+//       let generalQuestionIds: number[] = [];
+//       if (remainingQuestionsCount > 0) {
+//         // Build a query for general questions.
+//         let generalQuery = supabase
+//           .from("questions")
+//           .select("id")
+//           .eq("difficulty", difficulty)
+//           .eq("category", category);
+//         // Exclude questions from the mark values for which the user specified counts.
+//         const specificMarks = Object.keys(questionsByMark)
+//           .filter((markStr) => questionsByMark[Number(markStr)] > 0)
+//           .map((markStr) => Number(markStr));
+//         if (specificMarks.length > 0) {
+//           generalQuery = generalQuery.not(
+//             "marks",
+//             "in",
+//             `(${specificMarks.join(",")})`
+//           );
+//         }
+//         const { data: generalQuestions, error: generalQuestionError } =
+//           await generalQuery;
+//         if (generalQuestionError)
+//           throw new Error("Failed to fetch general questions");
+//         if (
+//           !generalQuestions ||
+//           generalQuestions.length < remainingQuestionsCount
+//         ) {
+//           throw new Error(
+//             "Not enough general questions available for the selected criteria"
+//           );
+//         }
+//         generalQuestionIds = generalQuestions
+//           .slice(0, remainingQuestionsCount)
+//           .map((q) => q.id);
+//       }
+
+//       // Combine all selected question IDs.
+//       const finalQuestionIds = [...specificQuestionIds, ...generalQuestionIds];
+
+//       // Insert the quiz (and optionally store questionsByMark info)
+//       const { error: quizError } = await supabase.from("quizzes").insert([
+//         {
+//           title: title.trim(),
+//           description: description.trim(),
+//           difficulty,
+//           time_limit: timeLimit,
+//           questions: finalQuestionIds,
+//           created_by: user?.id,
+//           category: category,
+//           // Extra field: store the mark-specific question counts if desired
+//           // questions_by_mark: questionsByMark,
+//         },
+//       ]);
+//       if (quizError) {
+//         console.error("Quiz creation error:", quizError);
+//         throw new Error("Failed to create quiz");
+//       }
+
+//       navigate("/teacher/quizzes");
+//     } catch (err) {
+//       setError(err instanceof Error ? err.message : "Failed to create quiz");
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   return (
+//     <div className="p-6">
+//       <h2 className="text-2xl font-bold text-gray-900 mb-6">Create Quiz</h2>
+//       <form onSubmit={handleSubmit} className="max-w-2xl space-y-4">
+//         {error && (
+//           <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+//             {error}
+//           </div>
+//         )}
+
+//         <div>
+//           <label className="block text-sm font-medium text-gray-700">
+//             Title
+//           </label>
+//           <input
+//             type="text"
+//             value={title}
+//             onChange={(e) => setTitle(e.target.value)}
+//             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//             required
+//           />
+//         </div>
+
+//         <div>
+//           <label className="block text-sm font-medium text-gray-700">
+//             Description
+//           </label>
+//           <textarea
+//             value={description}
+//             onChange={(e) => setDescription(e.target.value)}
+//             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//             rows={3}
+//           />
+//         </div>
+
+//         <div>
+//           <label className="block text-sm font-medium text-gray-700">
+//             Subject
+//           </label>
+//           <select
+//             value={category}
+//             onChange={(e) => setCategory(e.target.value)}
+//             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//           >
+//             <option value="">Select a subject</option>
+//             {categories.map((cat) => (
+//               <option key={cat} value={cat}>
+//                 {cat}
+//               </option>
+//             ))}
+//           </select>
+//         </div>
+
+//         <div>
+//           <label className="block text-sm font-medium text-gray-700">
+//             Difficulty
+//           </label>
+//           <select
+//             value={difficulty}
+//             onChange={(e) =>
+//               setDifficulty(e.target.value as "easy" | "medium" | "hard")
+//             }
+//             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//           >
+//             <option value="easy">Easy</option>
+//             <option value="medium">Medium</option>
+//             <option value="hard">Hard</option>
+//           </select>
+//         </div>
+
+//         <div>
+//           <label className="block text-sm font-medium text-gray-700">
+//             Total Number of Questions
+//           </label>
+//           <input
+//             type="number"
+//             value={numQuestions}
+//             onChange={(e) => setNumQuestions(parseInt(e.target.value))}
+//             min="1"
+//             max="50"
+//             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//           />
+//         </div>
+
+//         <div>
+//           <h3 className="text-lg font-semibold text-gray-800">
+//             Specify Questions by Marks
+//           </h3>
+//           {markSections.map((mark) => (
+//             <div key={mark}>
+//               <label className="block text-sm font-medium text-gray-700">
+//                 Number of {mark} Mark Questions
+//               </label>
+//               <input
+//                 type="number"
+//                 value={questionsByMark[mark] || 0}
+//                 onChange={(e) =>
+//                   setQuestionsByMark({
+//                     ...questionsByMark,
+//                     [mark]: parseInt(e.target.value),
+//                   })
+//                 }
+//                 min="0"
+//                 max="50"
+//                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//               />
+//             </div>
+//           ))}
+//         </div>
+
+//         <button
+//           type="submit"
+//           disabled={loading}
+//           className={`w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+//             loading ? "opacity-50 cursor-not-allowed" : ""
+//           }`}
+//         >
+//           {loading ? "Creating Quiz..." : "Create Quiz"}
+//         </button>
+//       </form>
+//     </div>
+//   );
+// }
 
 function QuizList() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);

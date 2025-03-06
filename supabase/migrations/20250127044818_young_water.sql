@@ -1,14 +1,5 @@
 /*
   # Fix authentication policies
-
-  1. Changes
-    - Add policy to allow profile creation during signup
-    - Fix RLS policies for profiles table
-    - Add better error handling for duplicate users
-
-  2. Security
-    - Maintain RLS while allowing necessary operations
-    - Ensure proper access control for profiles
 */
 
 -- Drop existing policies for profiles

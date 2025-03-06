@@ -1,14 +1,5 @@
 /*
   # Fix authentication recursion and policies
-
-  1. Changes
-    - Fix infinite recursion in profiles policies
-    - Simplify profile access controls
-    - Add better username check policy
-
-  2. Security
-    - Maintain RLS while preventing recursion
-    - Ensure proper access control for profiles
 */
 
 -- Drop existing policies
