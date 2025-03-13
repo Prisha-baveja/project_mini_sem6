@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Link, useNavigate, useParams } from "react-router-dom";
-import {GraduationCap,Book,LogOut,Plus,List,BarChart,Users,Award,User} from "lucide-react";
+import {GraduationCap,LogOut,Plus,List} from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { supabase } from "../lib/supabase";
 import { FaChalkboard } from "react-icons/fa";
@@ -37,17 +37,17 @@ interface Quiz {
   created_at: string;
 }
 
-interface Analytics {
-  totalStudents: number;
-  totalQuizzes: number;
-  averageScore: number;
-  completionRate: number;
-  scoresByDifficulty: {
-    easy: number;
-    medium: number;
-    hard: number;
-  };
-}
+// interface Analytics {
+//   totalStudents: number;
+//   totalQuizzes: number;
+//   averageScore: number;
+//   completionRate: number;
+//   scoresByDifficulty: {
+//     easy: number;
+//     medium: number;
+//     hard: number;
+//   };
+// }
 
 function Sidebar() {
   const logout = useAuthStore((state) => state.logout);
@@ -88,13 +88,6 @@ function Sidebar() {
           <FileText className="w-5 h-5" />
           Question Bank
         </Link>
-        <Link
-          to="/teacher/stats"
-          className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600"
-        >
-          <BarChart className="w-5 h-5" />
-          Statistics
-        </Link>
         <button
           onClick={handleLogout}
           className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-purple-50 hover:text-purple-600 w-full text-left"
@@ -106,136 +99,297 @@ function Sidebar() {
     </div>
   );
 }
+// interface ClassData {
+//   id: string;
+//   name: string;
+//   description: string;
+//   join_code: string;
+//   // other fields if needed
+// }
 
-
-function Statistics() {
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+function ClassMembers() {
+  const { classId } = useParams<{ classId: string }>();
+  const [members, setMembers] = useState<
+    { id: string; student_id: string; profiles: { username: string } }[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    loadAnalytics();
-  }, []);
+    const loadMembers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("class_members")
+          .select("id, student_id, profiles(username)")
+          .eq("class_id", classId);
+        if (error) {
+          console.error("Error loading class members:", error);
+        } else {
+          setMembers(data || []);
+        }
+      } catch (err) {
+        console.error("Unexpected error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const loadAnalytics = async () => {
-    // Get total students
-    const { count: studentCount } = await supabase
-      .from("profiles")
-      .select("*", { count: "exact", head: true })
-      .eq("role", "student");
+    if (classId) {
+      loadMembers();
+    }
+  }, [classId]);
 
-    // Get total quizzes
-    const { count: quizCount } = await supabase
-      .from("quizzes")
-      .select("*", { count: "exact", head: true });
-
-    // Get average score and completion rate
-    const { data: attempts } = await supabase
-      .from("quiz_attempts")
-      .select("score, quiz:quizzes(difficulty)");
-
-    let totalScore = 0;
-    const scoresByDifficulty = { easy: 0, medium: 0, hard: 0 };
-    const countByDifficulty = { easy: 0, medium: 0, hard: 0 };
-
-    attempts?.forEach((attempt) => {
-      totalScore += attempt.score;
-      const difficulty = attempt.quiz.difficulty as "easy" | "medium" | "hard";
-      scoresByDifficulty[difficulty] += attempt.score;
-      countByDifficulty[difficulty]++;
-    });
-
-    const averageScore = attempts?.length ? totalScore / attempts.length : 0;
-    const completionRate = attempts?.length
-      ? (attempts.length / (studentCount || 1)) * 100
-      : 0;
-
-    Object.keys(scoresByDifficulty).forEach((key) => {
-      const k = key as "easy" | "medium" | "hard";
-      scoresByDifficulty[k] = countByDifficulty[k]
-        ? scoresByDifficulty[k] / countByDifficulty[k]
-        : 0;
-    });
-
-    setAnalytics({
-      totalStudents: studentCount || 0,
-      totalQuizzes: quizCount || 0,
-      averageScore,
-      completionRate,
-      scoresByDifficulty,
-    });
-  };
-
-  if (!analytics) return null;
+  if (loading) return <div className="p-6">Loading members...</div>;
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">
-        Analytics Dashboard
+      <h2 className="text-2xl font-bold mb-4">
+        Class Members ({members.length})
       </h2>
+      {members.length === 0 ? (
+        <p>No members have joined this class yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {members.map((member) => (
+            <li
+              key={member.id}
+              className="bg-white p-3 rounded shadow flex justify-between items-center"
+            >
+              <span>{member.profiles?.username || member.student_id}</span>
+              {/* Report button */}
+              <button
+                onClick={() =>
+                  navigate(`/teacher/students/${member.student_id}/report`)
+                }
+                className="bg-green-600 text-white px-4 py-1 rounded-md hover:bg-green-700"
+              >
+                Report
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+interface Attempt {
+  score: number;
+  quiz: {
+    title: string;
+    total_marks: number;
+  };
+}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Students</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {analytics.totalStudents}
-              </p>
-            </div>
-            <Users className="w-8 h-8 text-purple-600" />
-          </div>
+// function StudentReport() {
+//   const { studentId } = useParams<{ studentId: string }>();
+//   const [attempts, setAttempts] = useState<Attempt[]>([]);
+//   const [loading, setLoading] = useState(true);
+//   const [report, setReport] = useState({
+//     totalQuizzes: 0,
+//     totalScore: 0,
+//     averageScore: 0,
+//   });
+
+//   useEffect(() => {
+//     if (studentId) {
+//       loadStudentReport();
+//     }
+//   }, [studentId]);
+
+//   const loadStudentReport = async () => {
+//     try {
+//       // Query quiz_attempts for this student
+//       const { data, error } = await supabase
+//         .from("quiz_attempts")
+//         .select("score, quiz:quizzes(title)")
+//         .eq("user_id", studentId);
+//       if (error) {
+//         console.error("Error fetching attempts:", error);
+//       } else {
+//         const attemptsData = data || [];
+//         setAttempts(attemptsData);
+
+//         const totalQuizzes = attemptsData.length;
+//         const totalScore = attemptsData.reduce(
+//           (sum: number, attempt: Attempt) => sum + attempt.score,
+//           0
+//         );
+//         const averageScore = totalQuizzes > 0 ? totalScore / totalQuizzes : 0;
+//         setReport({ totalQuizzes, totalScore, averageScore });
+//       }
+//     } catch (err) {
+//       console.error("Error loading student report:", err);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   if (loading) return <div className="p-6">Loading report...</div>;
+
+//   return (
+//     <div className="p-6">
+//       <h2 className="text-2xl font-bold mb-4">Student Report</h2>
+//       <div className="mb-4">
+//         <p className="text-lg">
+//           <strong>Total Quizzes Taken:</strong> {report.totalQuizzes}
+//         </p>
+//         <p className="text-lg">
+//           <strong>Total Score:</strong> {report.totalScore}
+//         </p>
+//         <p className="text-lg">
+//           <strong>Average Score:</strong> {report.averageScore.toFixed(1)}
+//         </p>
+//       </div>
+
+//       <div className="bg-white p-4 rounded-lg shadow">
+//         <h3 className="text-xl font-semibold mb-2">Quiz Attempts</h3>
+//         {attempts.length === 0 ? (
+//           <p>No quiz attempts found for this student.</p>
+//         ) : (
+//           <ul className="space-y-2">
+//             {attempts.map((attempt, idx) => (
+//               <li key={idx} className="border p-2 rounded">
+//                 <p>
+//                   <strong>Quiz:</strong> {attempt.quiz.title}
+//                 </p>
+//                 <p>
+//                   <strong>Score:</strong> {attempt.score} / {attempt.quiz.total_marks}
+//                 </p>
+//               </li>
+//             ))}
+//           </ul>
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
+
+function StudentReport() {
+  const { studentId } = useParams<{ studentId: string }>();
+  const navigate = useNavigate(); // For routing back
+  const [attempts, setAttempts] = useState<Attempt[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [report, setReport] = useState({
+    totalQuizzes: 0,
+    totalScore: 0,
+    averageScore: 0,
+  });
+
+  useEffect(() => {
+    if (studentId) {
+      loadStudentReport();
+    }
+  }, [studentId]);
+
+  const loadStudentReport = async () => {
+    try {
+      // Query quiz_attempts for this student, including the quiz details: title and questions.
+      const { data, error } = await supabase
+        .from("quiz_attempts")
+        .select("score, quiz:quizzes(title, questions)")
+        .eq("user_id", studentId);
+      if (error) {
+        console.error("Error fetching attempts:", error);
+      } else {
+        const attemptsData = data || [];
+
+        // For each attempt, fetch the questions and compute the total marks.
+        const attemptsWithTotalMarks = await Promise.all(
+          attemptsData.map(async (attempt: any) => {
+            let questionIds = attempt.quiz.questions;
+            // If the questions field is a string, parse it.
+            if (typeof questionIds === "string") {
+              try {
+                questionIds = JSON.parse(questionIds);
+              } catch (e) {
+                console.error("Error parsing quiz questions", e);
+                questionIds = [];
+              }
+            }
+            if (questionIds && questionIds.length > 0) {
+              // Fetch the marks for all questions in this quiz.
+              const { data: questionsData, error: questionsError } =
+                await supabase
+                  .from("questions")
+                  .select("marks")
+                  .in("id", questionIds);
+              if (questionsError) {
+                console.error(
+                  "Error fetching questions for quiz",
+                  questionsError
+                );
+                return { ...attempt, total_marks: 0 };
+              }
+              // Sum the marks.
+              const total_marks = questionsData.reduce(
+                (sum: number, q: any) => sum + Number(q.marks || 0),
+                0
+              );
+              return { ...attempt, total_marks };
+            } else {
+              return { ...attempt, total_marks: 0 };
+            }
+          })
+        );
+        setAttempts(attemptsWithTotalMarks);
+
+        // Compute overall report stats.
+        const totalQuizzes = attemptsWithTotalMarks.length;
+        const totalScore = attemptsWithTotalMarks.reduce(
+          (sum: number, attempt: any) => sum + attempt.score,
+          0
+        );
+        const averageScore = totalQuizzes > 0 ? totalScore / totalQuizzes : 0;
+        setReport({ totalQuizzes, totalScore, averageScore });
+      }
+    } catch (err) {
+      console.error("Error loading student report:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <div className="p-6">Loading report...</div>;
+
+  return (
+    <div className="relative min-h-screen p-6 bg-gray-100">
+      {/* Back Button positioned at the top right */}
+      <button
+        onClick={() => navigate(-1)}
+        className="absolute top-4 right-4 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
+      >
+        Back
+      </button>
+
+      {/* Student Report Content */}
+      <div className="max-w-3xl mx-auto mt-16">
+        <h2 className="text-2xl font-bold mb-4">Student Report</h2>
+        <div className="mb-4">
+          <p className="text-lg">
+            <strong>Total Quizzes Taken:</strong> {report.totalQuizzes}
+          </p>
+          <p className="text-lg">
+            <strong>Average Score:</strong> {report.averageScore.toFixed(1)}
+          </p>
         </div>
-
         <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Quizzes</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {analytics.totalQuizzes}
-              </p>
-            </div>
-            <Book className="w-8 h-8 text-purple-600" />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Average Score</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {analytics.averageScore.toFixed(1)}%
-              </p>
-            </div>
-            <Award className="w-8 h-8 text-purple-600" />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Completion Rate</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {analytics.completionRate.toFixed(1)}%
-              </p>
-            </div>
-            <BarChart className="w-8 h-8 text-purple-600" />
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Average Scores by Difficulty
-        </h3>
-        <div className="grid grid-cols-3 gap-4">
-          {Object.entries(analytics.scoresByDifficulty).map(
-            ([difficulty, score]) => (
-              <div key={difficulty} className="text-center">
-                <p className="text-sm text-gray-500 capitalize">{difficulty}</p>
-                <p className="text-xl font-bold text-gray-900">
-                  {score.toFixed(1)}%
-                </p>
-              </div>
-            )
+          <h3 className="text-xl font-semibold mb-2">Quiz Attempts</h3>
+          {attempts.length === 0 ? (
+            <p>No quiz attempts found for this student.</p>
+          ) : (
+            <ul className="space-y-2">
+              {attempts.map((attempt, idx) => (
+                <li key={idx} className="border p-2 rounded">
+                  <p>
+                    <strong>Quiz:</strong> {attempt.quiz.title}
+                  </p>
+                  <p>
+                    <strong>Score:</strong> {attempt.score} /{" "}
+                    {attempt.total_marks}
+                  </p>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </div>
@@ -243,182 +397,6 @@ function Statistics() {
   );
 }
 
-// function Classes() {
-//   const [classes, setClasses] = useState<Class[]>([]);
-//   const [showCreateForm, setShowCreateForm] = useState(false);
-//   const [newClassName, setNewClassName] = useState("");
-//   const [newClassDescription, setNewClassDescription] = useState("");
-//   const user = useAuthStore((state) => state.user);
-//   const navigate = useNavigate();
-
-//   useEffect(() => {
-//     if (user) {
-//       loadClasses();
-//     }
-//   }, [user]);
-
-//   const loadClasses = async () => {
-//     try {
-//       const { data, error } = await supabase
-//         .from("classes")
-//         .select("*")
-//         .eq("created_by", user?.id)
-//         .order("created_at", { ascending: false });
-//       if (error) throw error;
-//       if (data) {
-//         setClasses(data);
-//       }
-//     } catch (err) {
-//       console.error("Error loading classes:", err);
-//     }
-//   };
-
-//   const handleCreateClass = async (e: React.FormEvent) => {
-//     e.preventDefault();
-//     if (!user) return;
-
-//     try {
-//       // Generate an 8-character unique join code
-//       const joinCode = nanoid(8);
-
-//       const { error } = await supabase.from("classes").insert([
-//         {
-//           name: newClassName.trim(),
-//           description: newClassDescription.trim(),
-//           created_by: user.id,
-//           join_code: joinCode,
-//         },
-//       ]);
-
-//       if (error) throw error;
-
-//       setNewClassName("");
-//       setNewClassDescription("");
-//       setShowCreateForm(false);
-//       loadClasses();
-//     } catch (err) {
-//       console.error("Error creating class:", err);
-//     }
-//   };
-
-//   // New function to delete a class
-//   const handleDeleteClass = async (id: string) => {
-//     // Confirm deletion
-//     if (!window.confirm("Are you sure you want to delete this class?")) return;
-
-//     try {
-//       // Delete only if the current user is the creator
-//       const { error } = await supabase
-//         .from("classes")
-//         .delete()
-//         .eq("id", id)
-//         .eq("created_by", user.id);
-
-//       if (error) throw error;
-//       // Update the local state to remove the deleted class
-//       setClasses((prevClasses) => prevClasses.filter((cls) => cls.id !== id));
-//     } catch (err) {
-//       console.error("Error deleting class:", err);
-//     }
-//   };
-
-//   // Optionally, if you still want to fetch subjects (or class names) to fill a dropdown,
-//   // you could do that in a separate useEffect.
-
-//   return (
-//     <div className="p-6">
-//       <div className="flex justify-between items-center mb-6">
-//         <h2 className="text-2xl font-bold text-gray-900">Classes</h2>
-//         <button
-//           onClick={() => setShowCreateForm(true)}
-//           className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center gap-2"
-//         >
-//           <PlusCircle className="w-5 h-5" />
-//           Create Class
-//         </button>
-//       </div>
-
-//       {showCreateForm && (
-//         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-//           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-//             <h3 className="text-xl font-bold mb-4">Create New Class</h3>
-//             <form onSubmit={handleCreateClass}>
-//               <div className="mb-4">
-//                 <label className="block text-sm font-medium text-gray-700">
-//                   Class Name
-//                 </label>
-//                 <input
-//                   type="text"
-//                   value={newClassName}
-//                   onChange={(e) => setNewClassName(e.target.value)}
-//                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-//                   required
-//                 />
-//               </div>
-//               <div className="mb-4">
-//                 <label className="block text-sm font-medium text-gray-700">
-//                   Description
-//                 </label>
-//                 <textarea
-//                   value={newClassDescription}
-//                   onChange={(e) => setNewClassDescription(e.target.value)}
-//                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-//                   rows={3}
-//                 />
-//               </div>
-//               <div className="flex justify-end gap-2">
-//                 <button
-//                   type="button"
-//                   onClick={() => setShowCreateForm(false)}
-//                   className="px-4 py-2 text-gray-600 hover:text-gray-800"
-//                 >
-//                   Cancel
-//                 </button>
-//                 <button
-//                   type="submit"
-//                   className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
-//                 >
-//                   Create
-//                 </button>
-//               </div>
-//             </form>
-//           </div>
-//         </div>
-//       )}
-
-//       <div className="grid gap-4">
-//         {classes.map((cls) => (
-//           <div
-//             key={cls.id}
-//             className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow"
-//           >
-//             <div>
-//               <h3 className="text-lg font-medium text-gray-900">{cls.name}</h3>
-//               <p className="text-gray-500">{cls.description}</p>
-//             </div>
-//             <div className="flex justify-between items-center mt-4">
-//               <button
-//                 onClick={() => navigate(`/teacher/classes/${cls.id}`)}
-//                 className="text-purple-600 hover:text-purple-800"
-//               >
-//                 View Questions
-//               </button>
-//               <div className="flex items-center gap-4">
-//                 <p className="text-gray-500">Class Code: {cls.join_code}</p>
-//                 <button
-//                   onClick={() => handleDeleteClass(cls.id)}
-//                   className="text-red-600 hover:text-red-800"
-//                 >
-//                   Delete
-//                 </button>
-//               </div>
-//             </div>
-//           </div>
-//         ))}
-//       </div>
-//     </div>
-//   );
-// }
 
 function Classes() {
   const [classes, setClasses] = useState<Class[]>([]);
@@ -450,34 +428,6 @@ function Classes() {
     }
   };
 
-  // const handleCreateClass = async (e: React.FormEvent) => {
-  //   e.preventDefault();
-  //   if (!user) return;
-
-  //   try {
-  //     // Generate an 8-character unique join code
-  //     const joinCode = nanoid(8);
-
-  //     const { error } = await supabase.from("classes").insert([
-  //       {
-  //         name: newClassName.trim(),
-  //         description: newClassDescription.trim(),
-  //         created_by: user.id,
-  //         join_code: joinCode,
-  //       },
-  //     ]);
-
-  //     if (error) throw error;
-
-  //     setNewClassName("");
-  //     setNewClassDescription("");
-  //     setShowCreateForm(false);
-  //     loadClasses();
-  //   } catch (err) {
-  //     console.error("Error creating class:", err);
-  //   }
-  // };
-
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -488,7 +438,7 @@ function Classes() {
 
       const { error } = await supabase.from("classes").insert([
         {
-          name: newClassName.trim().toLowerCase(), // Ensure the class name is stored in lowercase
+          name: newClassName.trim().toLowerCase(), // store class name in lowercase
           description: newClassDescription.trim(),
           created_by: user.id,
           join_code: joinCode,
@@ -597,6 +547,12 @@ function Classes() {
             <div className="flex justify-end items-center mt-4 gap-4">
               <p className="text-gray-500">Class Code: {cls.join_code}</p>
               <button
+                onClick={() => navigate(`/teacher/classes/${cls.id}/members`)}
+                className="text-blue-600 hover:text-blue-800"
+              >
+                View Members
+              </button>
+              <button
                 onClick={() => handleDeleteClass(cls.id)}
                 className="text-red-600 hover:text-red-800"
               >
@@ -610,25 +566,688 @@ function Classes() {
   );
 }
 
+// function ClassQuestions() {
+//   const [questions, setQuestions] = useState<Question[]>([]);
+//   const [showCreateForm, setShowCreateForm] = useState(false);
+//   const [showEditForm, setShowEditForm] = useState(false);
+
+//   // Updated newQuestion state to include marks (as a string so we can use an input)
+//   const [newQuestion, setNewQuestion] = useState({
+//     question: "",
+//     options: ["", "", "", ""],
+//     correct_answer: [] as string[],
+//     difficulty: "medium" as "easy" | "medium" | "hard",
+//     questionType: "single" as "single" | "multiple",
+//     marks: "", // New field for marks allotment
+//   });
+
+//   // Update editingQuestion state type if needed.
+//   const [editingQuestion, setEditingQuestion] = useState<
+//     | (Question & {
+//         questionType: "single" | "multiple";
+//         correct_answer: string[];
+//         marks: number;
+//       })
+//     | null
+//   >(null);
+
+//   const { classId } = useParams<{ classId: string }>();
+//   const user = useAuthStore((state) => state.user);
+//   const navigate = useNavigate();
+
+//   useEffect(() => {
+//     if (classId) {
+//       loadQuestions();
+//     }
+//   }, [classId]);
+
+//   // const loadQuestions = async () => {
+//   //   try {
+//   //     const { data, error } = await supabase
+//   //       .from("questions")
+//   //       .select("*")
+//   //       .eq("class_id", classId)
+//   //       .order("created_at", { ascending: false });
+//   //     if (error) throw error;
+//   //     if (data) {
+//   //       setQuestions(data);
+//   //     }
+//   //   } catch (err) {
+//   //     console.error("Error loading questions:", err);
+//   //   }
+//   // };
+//   const loadQuestions = async () => {
+//     try {
+//       const { data, error } = await supabase
+//         .from("questions")
+//         .select("*")
+//         .eq("category", selectedClass);
+
+//       if (error) throw error;
+
+//       const formattedQuestions = data.map((question) => ({
+//         ...question,
+//         options: JSON.parse(question.options || "[]"), // Ensure options are parsed
+//         correct_answer: JSON.parse(question.correct_answer || "[]"), // Parse correct answers too
+//       }));
+
+//       setQuestions(formattedQuestions);
+//     } catch (err) {
+//       console.error("Error loading questions:", err);
+//     }
+//   };
+
+
+//   // Function to create a new question (including marks)
+//   const handleCreateQuestion = async (e: React.FormEvent) => {
+//     e.preventDefault();
+//     if (!user || !classId) return;
+
+//     // Validate that all fields are provided
+//     if (
+//       !newQuestion.question.trim() ||
+//       newQuestion.options.some((opt) => !opt.trim()) ||
+//       !newQuestion.marks ||
+//       (newQuestion.questionType === "single" &&
+//         (!newQuestion.correct_answer[0] ||
+//           !newQuestion.correct_answer[0].trim())) ||
+//       (newQuestion.questionType === "multiple" &&
+//         newQuestion.correct_answer.length === 0)
+//     ) {
+//       alert("Please fill in all fields and select at least one correct answer.");
+//       return;
+//     }
+
+//     try {
+//       // Fetch the class details to get the 'name' which we'll use as the category.
+//       const { data: classData, error: classError } = await supabase
+//         .from("classes")
+//         .select("name")
+//         .eq("id", classId)
+//         .single();
+
+//       if (classError || !classData) {
+//         throw new Error("Failed to fetch class details for category");
+//       }
+
+//       const categoryForQuestion = classData.name; // using class name as category
+
+//       // Insert question into the database; convert marks to a number.
+//       const { error } = await supabase.from("questions").insert([
+//         {
+//           ...newQuestion,
+//           category: categoryForQuestion,
+//           class_id: classId,
+//           created_by: user.id,
+//           marks: parseInt(newQuestion.marks, 10), // include marks allotment
+//         },
+//       ]);
+
+//       if (error) throw error;
+
+//       // Reset form and close modal
+//       setShowCreateForm(false);
+//       setNewQuestion({
+//         question: "",
+//         options: ["", "", "", ""],
+//         correct_answer: [],
+//         difficulty: "medium",
+//         questionType: "single",
+//         marks: "",
+//       });
+//       loadQuestions();
+//     } catch (err) {
+//       console.error("Error creating question:", err);
+//     }
+//   };
+
+//   // Function to delete a question
+//   const handleDeleteQuestion = async (questionId: string) => {
+//     if (!window.confirm("Are you sure you want to delete this question?")) return;
+//     try {
+//       const { error } = await supabase
+//         .from("questions")
+//         .delete()
+//         .eq("id", questionId)
+//         .eq("created_by", user.id);
+//       if (error) throw error;
+//       setQuestions((prev) => prev.filter((q) => q.id !== questionId));
+//     } catch (err) {
+//       console.error("Error deleting question:", err);
+//     }
+//   };
+
+//   // Function to update a question
+//   const handleUpdateQuestion = async (e: React.FormEvent) => {
+//     e.preventDefault();
+//     if (!user || !editingQuestion) return;
+//     try {
+//       const { error } = await supabase
+//         .from("questions")
+//         .update({
+//           question: editingQuestion.question.trim(),
+//           options: editingQuestion.options.map((opt) => opt.trim()),
+//           correct_answer: editingQuestion.correct_answer,
+//           difficulty: editingQuestion.difficulty,
+//           questionType: editingQuestion.questionType,
+//           marks: editingQuestion.marks, // update marks as well
+//         })
+//         .eq("id", editingQuestion.id)
+//         .eq("created_by", user.id);
+//       if (error) throw error;
+//       setEditingQuestion(null);
+//       setShowEditForm(false);
+//       loadQuestions();
+//     } catch (err) {
+//       console.error("Error updating question:", err);
+//     }
+//   };
+
+//   // Function to handle field changes in the edit form
+//   const handleEditFieldChange = (
+//     field: keyof Question,
+//     value:
+//       | string
+//       | string[]
+//       | "easy"
+//       | "medium"
+//       | "hard"
+//       | "single"
+//       | "multiple"
+//   ) => {
+//     if (!editingQuestion) return;
+//     setEditingQuestion({
+//       ...editingQuestion,
+//       [field]: value,
+//     });
+//   };
+
+//   return (
+//     <div className="p-6">
+//       <div className="flex justify-between items-center mb-6">
+//         <h2 className="text-2xl font-bold text-gray-900">Questions</h2>
+//         <button
+//           onClick={() => setShowCreateForm(true)}
+//           className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center gap-2"
+//         >
+//           <Plus className="w-5 h-5" />
+//           Add Question
+//         </button>
+//       </div>
+//       {/* Create Question Modal */}
+//       {showCreateForm && (
+//         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+//           <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
+//             <h3 className="text-xl font-bold mb-4">Create New Question</h3>
+//             <form onSubmit={handleCreateQuestion}>
+//               <div className="mb-4">
+//                 <label className="block text-sm font-medium text-gray-700">
+//                   Question
+//                 </label>
+//                 <textarea
+//                   value={newQuestion.question}
+//                   onChange={(e) =>
+//                     setNewQuestion({ ...newQuestion, question: e.target.value })
+//                   }
+//                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//                   rows={3}
+//                   required
+//                 />
+//               </div>
+
+//               {/* New: Choose Question Type */}
+//               <div className="mb-4">
+//                 <label className="block text-sm font-medium text-gray-700">
+//                   Question Type
+//                 </label>
+//                 <select
+//                   value={newQuestion.questionType}
+//                   onChange={(e) =>
+//                     setNewQuestion({
+//                       ...newQuestion,
+//                       questionType: e.target.value as "single" | "multiple",
+//                       correct_answer: [],
+//                     })
+//                   }
+//                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//                 >
+//                   <option value="single">Single Correct Answer</option>
+//                   <option value="multiple">Multiple Correct Answers</option>
+//                 </select>
+//               </div>
+
+//               <div className="mb-4">
+//                 <label className="block text-sm font-medium text-gray-700 mb-2">
+//                   Options
+//                 </label>
+//                 {newQuestion.options.map((option, index) => (
+//                   <div key={index} className="mb-2">
+//                     <input
+//                       type="text"
+//                       value={option}
+//                       onChange={(e) => {
+//                         const newOptions = [...newQuestion.options];
+//                         const oldOption = newOptions[index];
+//                         const updatedOption = e.target.value;
+//                         newOptions[index] = updatedOption;
+//                         // Replace the old option with the updated value if it was selected as correct
+//                         const newCorrect = newQuestion.correct_answer.map(
+//                           (ans) => (ans === oldOption ? updatedOption : ans)
+//                         );
+//                         setNewQuestion({
+//                           ...newQuestion,
+//                           options: newOptions,
+//                           correct_answer: newCorrect,
+//                         });
+//                       }}
+//                       className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//                       placeholder={`Option ${index + 1}`}
+//                       required
+//                     />
+//                   </div>
+//                 ))}
+//               </div>
+
+//               {/* Conditional Correct Answer Section */}
+//               {newQuestion.questionType === "single" ? (
+//                 <div className="mb-4">
+//                   <label className="block text-sm font-medium text-gray-700">
+//                     Correct Answer
+//                   </label>
+//                   <select
+//                     value={newQuestion.correct_answer[0] || ""}
+//                     onChange={(e) =>
+//                       setNewQuestion({
+//                         ...newQuestion,
+//                         correct_answer: [e.target.value],
+//                       })
+//                     }
+//                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//                     required
+//                   >
+//                     <option value="">Select correct answer</option>
+//                     {newQuestion.options.map((option, index) => (
+//                       <option key={index} value={option}>
+//                         {option || `Option ${index + 1}`}
+//                       </option>
+//                     ))}
+//                   </select>
+//                 </div>
+//               ) : (
+//                 <div className="mb-4">
+//                   <label className="block text-sm font-medium text-gray-700">
+//                     Correct Answers
+//                   </label>
+//                   {newQuestion.options.map((option, index) => (
+//                     <div key={index} className="flex items-center gap-2 mb-2">
+//                       <input
+//                         type="checkbox"
+//                         checked={newQuestion.correct_answer.includes(option)}
+//                         onChange={(e) => {
+//                           if (e.target.checked) {
+//                             setNewQuestion((prev) => ({
+//                               ...prev,
+//                               correct_answer: [...prev.correct_answer, option],
+//                             }));
+//                           } else {
+//                             setNewQuestion((prev) => ({
+//                               ...prev,
+//                               correct_answer: prev.correct_answer.filter(
+//                                 (ans) => ans !== option
+//                               ),
+//                             }));
+//                           }
+//                         }}
+//                       />
+//                       <span>{option || `Option ${index + 1}`}</span>
+//                     </div>
+//                   ))}
+//                 </div>
+//               )}
+
+//               {/* Marks allotment input */}
+//               <div className="mb-4">
+//                 <label className="block text-sm font-medium text-gray-700">
+//                   Marks
+//                 </label>
+//                 <input
+//                   type="number"
+//                   value={newQuestion.marks}
+//                   onChange={(e) =>
+//                     setNewQuestion({ ...newQuestion, marks: e.target.value })
+//                   }
+//                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//                   placeholder="Enter marks for this question"
+//                   required
+//                 />
+//               </div>
+
+//               <div className="mb-4">
+//                 <label className="block text-sm font-medium text-gray-700">
+//                   Difficulty
+//                 </label>
+//                 <select
+//                   value={newQuestion.difficulty}
+//                   onChange={(e) =>
+//                     setNewQuestion({
+//                       ...newQuestion,
+//                       difficulty: e.target.value as "easy" | "medium" | "hard",
+//                     })
+//                   }
+//                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//                 >
+//                   <option value="easy">Easy</option>
+//                   <option value="medium">Medium</option>
+//                   <option value="hard">Hard</option>
+//                 </select>
+//               </div>
+
+//               <div className="flex justify-end gap-2">
+//                 <button
+//                   type="button"
+//                   onClick={() => setShowCreateForm(false)}
+//                   className="px-4 py-2 text-gray-600 hover:text-gray-800"
+//                 >
+//                   Cancel
+//                 </button>
+//                 <button
+//                   type="submit"
+//                   className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+//                 >
+//                   Create
+//                 </button>
+//               </div>
+//             </form>
+//           </div>
+//         </div>
+//       )}
+//       {/* Edit Question Modal */}
+//       {showEditForm && editingQuestion && (
+//         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+//           <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
+//             <h3 className="text-xl font-bold mb-4">Edit Question</h3>
+//             <form onSubmit={handleUpdateQuestion}>
+//               <div className="mb-4">
+//                 <label className="block text-sm font-medium text-gray-700">
+//                   Question
+//                 </label>
+//                 <textarea
+//                   value={editingQuestion.question}
+//                   onChange={(e) =>
+//                     handleEditFieldChange("question", e.target.value)
+//                   }
+//                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//                   rows={3}
+//                   required
+//                 />
+//               </div>
+
+//               <div className="mb-4">
+//                 <label className="block text-sm font-medium text-gray-700">
+//                   Question Type
+//                 </label>
+//                 <select
+//                   value={editingQuestion.questionType}
+//                   onChange={(e) =>
+//                     handleEditFieldChange(
+//                       "questionType",
+//                       e.target.value as "single" | "multiple"
+//                     )
+//                   }
+//                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//                 >
+//                   <option value="single">Single Correct Answer</option>
+//                   <option value="multiple">Multiple Correct Answers</option>
+//                 </select>
+//               </div>
+
+//               <div className="mb-4">
+//                 <label className="block text-sm font-medium text-gray-700 mb-2">
+//                   Options
+//                 </label>
+//                 {editingQuestion.options.map((option, index) => (
+//                   <div key={index} className="mb-2">
+//                     <input
+//                       type="text"
+//                       value={option}
+//                       onChange={(e) => {
+//                         const newOptions = [...editingQuestion.options];
+//                         newOptions[index] = e.target.value;
+//                         handleEditFieldChange("options", newOptions);
+//                       }}
+//                       className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//                       placeholder={`Option ${index + 1}`}
+//                       required
+//                     />
+//                   </div>
+//                 ))}
+//               </div>
+
+//               {editingQuestion.questionType === "single" ? (
+//                 <div className="mb-4">
+//                   <label className="block text-sm font-medium text-gray-700">
+//                     Correct Answer
+//                   </label>
+//                   <select
+//                     value={editingQuestion.correct_answer[0] || ""}
+//                     onChange={(e) =>
+//                       handleEditFieldChange("correct_answer", [e.target.value])
+//                     }
+//                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//                     required
+//                   >
+//                     <option value="">Select correct answer</option>
+//                     {editingQuestion.options.map((option, index) => (
+//                       <option key={index} value={option}>
+//                         {option || `Option ${index + 1}`}
+//                       </option>
+//                     ))}
+//                   </select>
+//                 </div>
+//               ) : (
+//                 <div className="mb-4">
+//                   <label className="block text-sm font-medium text-gray-700">
+//                     Correct Answers
+//                   </label>
+//                   {editingQuestion.options.map((option, index) => (
+//                     <div key={index} className="flex items-center gap-2 mb-2">
+//                       <input
+//                         type="checkbox"
+//                         checked={editingQuestion.correct_answer.includes(
+//                           option
+//                         )}
+//                         onChange={() => {
+//                           const alreadySelected =
+//                             editingQuestion.correct_answer.includes(option);
+//                           const newCorrectAnswers = alreadySelected
+//                             ? editingQuestion.correct_answer.filter(
+//                                 (ans) => ans !== option
+//                               )
+//                             : [...editingQuestion.correct_answer, option];
+//                           handleEditFieldChange(
+//                             "correct_answer",
+//                             newCorrectAnswers
+//                           );
+//                         }}
+//                       />
+//                       <span>{option || `Option ${index + 1}`}</span>
+//                     </div>
+//                   ))}
+//                 </div>
+//               )}
+
+//               <div className="mb-4">
+//                 <label className="block text-sm font-medium text-gray-700">
+//                   Marks
+//                 </label>
+//                 <input
+//                   type="number"
+//                   value={editingQuestion.marks}
+//                   onChange={(e) =>
+//                     handleEditFieldChange("marks", parseInt(e.target.value, 10))
+//                   }
+//                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//                   required
+//                 />
+//               </div>
+
+//               <div className="mb-4">
+//                 <label className="block text-sm font-medium text-gray-700">
+//                   Difficulty
+//                 </label>
+//                 <select
+//                   value={editingQuestion.difficulty}
+//                   onChange={(e) =>
+//                     handleEditFieldChange(
+//                       "difficulty",
+//                       e.target.value as "easy" | "medium" | "hard"
+//                     )
+//                   }
+//                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+//                 >
+//                   <option value="easy">Easy</option>
+//                   <option value="medium">Medium</option>
+//                   <option value="hard">Hard</option>
+//                 </select>
+//               </div>
+
+//               <div className="flex justify-end gap-2">
+//                 <button
+//                   type="button"
+//                   onClick={() => {
+//                     setShowEditForm(false);
+//                     setEditingQuestion(null);
+//                   }}
+//                   className="px-4 py-2 text-gray-600 hover:text-gray-800"
+//                 >
+//                   Cancel
+//                 </button>
+//                 <button
+//                   type="submit"
+//                   className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+//                 >
+//                   Update
+//                 </button>
+//               </div>
+//             </form>
+//           </div>
+//         </div>
+//       )}
+//       {/* Display Questions */}
+//       <div className="grid gap-4">
+//         {questions.map((question) => (
+//           <div
+//             key={question.id}
+//             className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow"
+//           >
+//             <div className="flex justify-between items-start">
+//               <h3 className="text-lg font-medium text-gray-900">
+//                 {question.question}
+//               </h3>
+//               <div className="flex gap-2">
+//                 <span
+//                   className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+//                     question.difficulty === "easy"
+//                       ? "bg-green-100 text-green-800"
+//                       : question.difficulty === "medium"
+//                       ? "bg-yellow-100 text-yellow-800"
+//                       : "bg-red-100 text-red-800"
+//                   }`}
+//                 >
+//                   {question.difficulty}
+//                 </span>
+//                 <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-indigo-100 text-indigo-800">
+//                   {question.marks} Marks
+//                 </span>
+//               </div>
+//             </div>
+//             <div className="mt-4 space-y-2">
+//               {question.options.map((option, index) => {
+//                 // Convert the correct_answer to an array if stored as string
+//                 let correctAnswers: string[];
+//                 console.log("Question Options:", question.options);
+//                 if (typeof question.correct_answer === "string") {
+//                   try {
+//                     const parsed = JSON.parse(question.correct_answer);
+//                     correctAnswers = Array.isArray(parsed)
+//                       ? parsed
+//                       : [question.correct_answer];
+//                   } catch (e) {
+//                     correctAnswers = [question.correct_answer];
+//                   }
+//                 } else {
+//                   correctAnswers = question.correct_answer;
+//                 }
+
+//                 const isCorrect = correctAnswers.some(
+//                   (ans) =>
+//                     ans.trim().toLowerCase() === option.trim().toLowerCase()
+//                 );
+
+//                 return (
+//                   <div
+//                     key={index}
+//                     className={`p-2 rounded flex justify-between items-center ${
+//                       isCorrect
+//                         ? "bg-green-100 text-green-800"
+//                         : "bg-gray-50 text-gray-900"
+//                     }`}
+//                   >
+//                     <span>{option}</span>
+//                     {isCorrect && (
+//                       <span className="ml-2 text-xs font-semibold text-green-600 uppercase tracking-wide">
+//                         Correct
+//                       </span>
+//                     )}
+//                   </div>
+//                 );
+//               })}
+//             </div>
+//             <div className="flex justify-end items-center gap-4 mt-4">
+//               <button
+//                 onClick={() => {
+//                   setEditingQuestion(question);
+//                   setShowEditForm(true);
+//                 }}
+//                 className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+//               >
+//                 <Edit className="w-4 h-4" />
+//                 Edit
+//               </button>
+//               <button
+//                 onClick={() => handleDeleteQuestion(question.id)}
+//                 className="text-red-600 hover:text-red-800 flex items-center gap-1"
+//               >
+//                 <Trash2 className="w-4 h-4" />
+//                 Delete
+//               </button>
+//             </div>
+//           </div>
+//         ))}
+//       </div>
+//     </div>
+//   );
+// }
+
 function ClassQuestions() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
 
-  // Updated newQuestion state to include marks (as a string so we can use an input)
+  // Updated newQuestion state to include additional types
   const [newQuestion, setNewQuestion] = useState({
     question: "",
     options: ["", "", "", ""],
     correct_answer: [] as string[],
     difficulty: "medium" as "easy" | "medium" | "hard",
-    questionType: "single" as "single" | "multiple",
+    questionType: "single" as "single" | "multiple" | "numerical" | "fill",
     marks: "", // New field for marks allotment
   });
 
   // Update editingQuestion state type if needed.
   const [editingQuestion, setEditingQuestion] = useState<
     | (Question & {
-        questionType: "single" | "multiple";
+        questionType: "single" | "multiple" | "numerical" | "fill";
         correct_answer: string[];
         marks: number;
       })
@@ -645,42 +1264,24 @@ function ClassQuestions() {
     }
   }, [classId]);
 
-  // const loadQuestions = async () => {
-  //   try {
-  //     const { data, error } = await supabase
-  //       .from("questions")
-  //       .select("*")
-  //       .eq("class_id", classId)
-  //       .order("created_at", { ascending: false });
-  //     if (error) throw error;
-  //     if (data) {
-  //       setQuestions(data);
-  //     }
-  //   } catch (err) {
-  //     console.error("Error loading questions:", err);
-  //   }
-  // };
+  // Adjusted loadQuestions to work with category (using class details if needed)
   const loadQuestions = async () => {
     try {
       const { data, error } = await supabase
         .from("questions")
         .select("*")
-        .eq("category", selectedClass);
-
+        .eq("category", classId); // or adjust based on your data model
       if (error) throw error;
-
       const formattedQuestions = data.map((question) => ({
         ...question,
         options: JSON.parse(question.options || "[]"), // Ensure options are parsed
         correct_answer: JSON.parse(question.correct_answer || "[]"), // Parse correct answers too
       }));
-
       setQuestions(formattedQuestions);
     } catch (err) {
       console.error("Error loading questions:", err);
     }
   };
-
 
   // Function to create a new question (including marks)
   const handleCreateQuestion = async (e: React.FormEvent) => {
@@ -690,15 +1291,24 @@ function ClassQuestions() {
     // Validate that all fields are provided
     if (
       !newQuestion.question.trim() ||
-      newQuestion.options.some((opt) => !opt.trim()) ||
+      // For single or multiple, ensure all option fields are filled
+      ((newQuestion.questionType === "single" ||
+        newQuestion.questionType === "multiple") &&
+        newQuestion.options.some((opt) => !opt.trim())) ||
       !newQuestion.marks ||
       (newQuestion.questionType === "single" &&
         (!newQuestion.correct_answer[0] ||
           !newQuestion.correct_answer[0].trim())) ||
       (newQuestion.questionType === "multiple" &&
-        newQuestion.correct_answer.length === 0)
+        newQuestion.correct_answer.length === 0) ||
+      ((newQuestion.questionType === "numerical" ||
+        newQuestion.questionType === "fill") &&
+        (!newQuestion.correct_answer[0] ||
+          !newQuestion.correct_answer[0].trim()))
     ) {
-      alert("Please fill in all fields and select at least one correct answer.");
+      alert(
+        "Please fill in all fields and select at least one correct answer."
+      );
       return;
     }
 
@@ -723,7 +1333,14 @@ function ClassQuestions() {
           category: categoryForQuestion,
           class_id: classId,
           created_by: user.id,
-          marks: parseInt(newQuestion.marks, 10), // include marks allotment
+          // For single/multiple, store options; otherwise, send null
+          options:
+            newQuestion.questionType === "single" ||
+            newQuestion.questionType === "multiple"
+              ? JSON.stringify(newQuestion.options)
+              : null,
+          correct_answer: JSON.stringify(newQuestion.correct_answer),
+          marks: parseInt(newQuestion.marks, 10),
         },
       ]);
 
@@ -747,7 +1364,8 @@ function ClassQuestions() {
 
   // Function to delete a question
   const handleDeleteQuestion = async (questionId: string) => {
-    if (!window.confirm("Are you sure you want to delete this question?")) return;
+    if (!window.confirm("Are you sure you want to delete this question?"))
+      return;
     try {
       const { error } = await supabase
         .from("questions")
@@ -770,8 +1388,12 @@ function ClassQuestions() {
         .from("questions")
         .update({
           question: editingQuestion.question.trim(),
-          options: editingQuestion.options.map((opt) => opt.trim()),
-          correct_answer: editingQuestion.correct_answer,
+          options:
+            editingQuestion.questionType === "single" ||
+            editingQuestion.questionType === "multiple"
+              ? JSON.stringify(editingQuestion.options)
+              : null,
+          correct_answer: JSON.stringify(editingQuestion.correct_answer),
           difficulty: editingQuestion.difficulty,
           questionType: editingQuestion.questionType,
           marks: editingQuestion.marks, // update marks as well
@@ -798,6 +1420,8 @@ function ClassQuestions() {
       | "hard"
       | "single"
       | "multiple"
+      | "numerical"
+      | "fill"
   ) => {
     if (!editingQuestion) return;
     setEditingQuestion({
@@ -818,6 +1442,7 @@ function ClassQuestions() {
           Add Question
         </button>
       </div>
+
       {/* Create Question Modal */}
       {showCreateForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
@@ -839,7 +1464,7 @@ function ClassQuestions() {
                 />
               </div>
 
-              {/* New: Choose Question Type */}
+              {/* Choose Question Type */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700">
                   Question Type
@@ -849,7 +1474,11 @@ function ClassQuestions() {
                   onChange={(e) =>
                     setNewQuestion({
                       ...newQuestion,
-                      questionType: e.target.value as "single" | "multiple",
+                      questionType: e.target.value as
+                        | "single"
+                        | "multiple"
+                        | "numerical"
+                        | "fill",
                       correct_answer: [],
                     })
                   }
@@ -857,48 +1486,122 @@ function ClassQuestions() {
                 >
                   <option value="single">Single Correct Answer</option>
                   <option value="multiple">Multiple Correct Answers</option>
+                  <option value="numerical">Numerical</option>
+                  <option value="fill">Fill in the Blank</option>
                 </select>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Options
-                </label>
-                {newQuestion.options.map((option, index) => (
-                  <div key={index} className="mb-2">
-                    <input
-                      type="text"
-                      value={option}
-                      onChange={(e) => {
-                        const newOptions = [...newQuestion.options];
-                        const oldOption = newOptions[index];
-                        const updatedOption = e.target.value;
-                        newOptions[index] = updatedOption;
-                        // Replace the old option with the updated value if it was selected as correct
-                        const newCorrect = newQuestion.correct_answer.map(
-                          (ans) => (ans === oldOption ? updatedOption : ans)
-                        );
-                        setNewQuestion({
-                          ...newQuestion,
-                          options: newOptions,
-                          correct_answer: newCorrect,
-                        });
-                      }}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                      placeholder={`Option ${index + 1}`}
-                      required
-                    />
+              {/* Render Options or Answer Input Conditionally */}
+              {(newQuestion.questionType === "single" ||
+                newQuestion.questionType === "multiple") && (
+                <>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Options
+                    </label>
+                    {newQuestion.options.map((option, index) => (
+                      <div key={index} className="mb-2">
+                        <input
+                          type="text"
+                          value={option}
+                          onChange={(e) => {
+                            const newOptions = [...newQuestion.options];
+                            const oldOption = newOptions[index];
+                            const updatedOption = e.target.value;
+                            newOptions[index] = updatedOption;
+                            // Replace the old option with the updated value if it was selected as correct
+                            const newCorrect = newQuestion.correct_answer.map(
+                              (ans) => (ans === oldOption ? updatedOption : ans)
+                            );
+                            setNewQuestion({
+                              ...newQuestion,
+                              options: newOptions,
+                              correct_answer: newCorrect,
+                            });
+                          }}
+                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          placeholder={`Option ${index + 1}`}
+                          required
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
-              {/* Conditional Correct Answer Section */}
-              {newQuestion.questionType === "single" ? (
+                  {newQuestion.questionType === "single" ? (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Correct Answer
+                      </label>
+                      <select
+                        value={newQuestion.correct_answer[0] || ""}
+                        onChange={(e) =>
+                          setNewQuestion({
+                            ...newQuestion,
+                            correct_answer: [e.target.value],
+                          })
+                        }
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                        required
+                      >
+                        <option value="">Select correct answer</option>
+                        {newQuestion.options.map((option, index) => (
+                          <option key={index} value={option}>
+                            {option || `Option ${index + 1}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    // For multiple correct answers
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Correct Answers
+                      </label>
+                      {newQuestion.options.map((option, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 mb-2"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={newQuestion.correct_answer.includes(
+                              option
+                            )}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewQuestion((prev) => ({
+                                  ...prev,
+                                  correct_answer: [
+                                    ...prev.correct_answer,
+                                    option,
+                                  ],
+                                }));
+                              } else {
+                                setNewQuestion((prev) => ({
+                                  ...prev,
+                                  correct_answer: prev.correct_answer.filter(
+                                    (ans) => ans !== option
+                                  ),
+                                }));
+                              }
+                            }}
+                          />
+                          <span>{option || `Option ${index + 1}`}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {(newQuestion.questionType === "numerical" ||
+                newQuestion.questionType === "fill") && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700">
-                    Correct Answer
+                    Answer
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={newQuestion.correct_answer[0] || ""}
                     onChange={(e) =>
                       setNewQuestion({
@@ -906,46 +1609,9 @@ function ClassQuestions() {
                         correct_answer: [e.target.value],
                       })
                     }
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                     required
-                  >
-                    <option value="">Select correct answer</option>
-                    {newQuestion.options.map((option, index) => (
-                      <option key={index} value={option}>
-                        {option || `Option ${index + 1}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Correct Answers
-                  </label>
-                  {newQuestion.options.map((option, index) => (
-                    <div key={index} className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        checked={newQuestion.correct_answer.includes(option)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setNewQuestion((prev) => ({
-                              ...prev,
-                              correct_answer: [...prev.correct_answer, option],
-                            }));
-                          } else {
-                            setNewQuestion((prev) => ({
-                              ...prev,
-                              correct_answer: prev.correct_answer.filter(
-                                (ans) => ans !== option
-                              ),
-                            }));
-                          }
-                        }}
-                      />
-                      <span>{option || `Option ${index + 1}`}</span>
-                    </div>
-                  ))}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                  />
                 </div>
               )}
 
@@ -1005,6 +1671,7 @@ function ClassQuestions() {
           </div>
         </div>
       )}
+
       {/* Edit Question Modal */}
       {showEditForm && editingQuestion && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
@@ -1035,88 +1702,120 @@ function ClassQuestions() {
                   onChange={(e) =>
                     handleEditFieldChange(
                       "questionType",
-                      e.target.value as "single" | "multiple"
+                      e.target.value as
+                        | "single"
+                        | "multiple"
+                        | "numerical"
+                        | "fill"
                     )
                   }
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                 >
                   <option value="single">Single Correct Answer</option>
                   <option value="multiple">Multiple Correct Answers</option>
+                  <option value="numerical">Numerical</option>
+                  <option value="fill">Fill in the Blank</option>
                 </select>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Options
-                </label>
-                {editingQuestion.options.map((option, index) => (
-                  <div key={index} className="mb-2">
-                    <input
-                      type="text"
-                      value={option}
-                      onChange={(e) => {
-                        const newOptions = [...editingQuestion.options];
-                        newOptions[index] = e.target.value;
-                        handleEditFieldChange("options", newOptions);
-                      }}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                      placeholder={`Option ${index + 1}`}
-                      required
-                    />
+              {editingQuestion.questionType === "single" ||
+              editingQuestion.questionType === "multiple" ? (
+                <>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Options
+                    </label>
+                    {editingQuestion.options.map((option, index) => (
+                      <div key={index} className="mb-2">
+                        <input
+                          type="text"
+                          value={option}
+                          onChange={(e) => {
+                            const newOptions = [...editingQuestion.options];
+                            newOptions[index] = e.target.value;
+                            handleEditFieldChange("options", newOptions);
+                          }}
+                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                          placeholder={`Option ${index + 1}`}
+                          required
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
-              {editingQuestion.questionType === "single" ? (
+                  {editingQuestion.questionType === "single" ? (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Correct Answer
+                      </label>
+                      <select
+                        value={editingQuestion.correct_answer[0] || ""}
+                        onChange={(e) =>
+                          handleEditFieldChange("correct_answer", [
+                            e.target.value,
+                          ])
+                        }
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                        required
+                      >
+                        <option value="">Select correct answer</option>
+                        {editingQuestion.options.map((option, index) => (
+                          <option key={index} value={option}>
+                            {option || `Option ${index + 1}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    // For multiple correct answers
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Correct Answers
+                      </label>
+                      {editingQuestion.options.map((option, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 mb-2"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={editingQuestion.correct_answer.includes(
+                              option
+                            )}
+                            onChange={() => {
+                              const alreadySelected =
+                                editingQuestion.correct_answer.includes(option);
+                              const newCorrectAnswers = alreadySelected
+                                ? editingQuestion.correct_answer.filter(
+                                    (ans) => ans !== option
+                                  )
+                                : [...editingQuestion.correct_answer, option];
+                              handleEditFieldChange(
+                                "correct_answer",
+                                newCorrectAnswers
+                              );
+                            }}
+                          />
+                          <span>{option || `Option ${index + 1}`}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700">
-                    Correct Answer
+                    Answer
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={editingQuestion.correct_answer[0] || ""}
                     onChange={(e) =>
                       handleEditFieldChange("correct_answer", [e.target.value])
                     }
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                     required
-                  >
-                    <option value="">Select correct answer</option>
-                    {editingQuestion.options.map((option, index) => (
-                      <option key={index} value={option}>
-                        {option || `Option ${index + 1}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Correct Answers
-                  </label>
-                  {editingQuestion.options.map((option, index) => (
-                    <div key={index} className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        checked={editingQuestion.correct_answer.includes(
-                          option
-                        )}
-                        onChange={() => {
-                          const alreadySelected =
-                            editingQuestion.correct_answer.includes(option);
-                          const newCorrectAnswers = alreadySelected
-                            ? editingQuestion.correct_answer.filter(
-                                (ans) => ans !== option
-                              )
-                            : [...editingQuestion.correct_answer, option];
-                          handleEditFieldChange(
-                            "correct_answer",
-                            newCorrectAnswers
-                          );
-                        }}
-                      />
-                      <span>{option || `Option ${index + 1}`}</span>
-                    </div>
-                  ))}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                  />
                 </div>
               )}
 
@@ -1177,6 +1876,7 @@ function ClassQuestions() {
           </div>
         </div>
       )}
+
       {/* Display Questions */}
       <div className="grid gap-4">
         {questions.map((question) => (
@@ -1206,46 +1906,32 @@ function ClassQuestions() {
               </div>
             </div>
             <div className="mt-4 space-y-2">
-              {question.options.map((option, index) => {
-                // Convert the correct_answer to an array if stored as string
-                let correctAnswers: string[];
-                console.log("Question Options:", question.options);
-                if (typeof question.correct_answer === "string") {
-                  try {
-                    const parsed = JSON.parse(question.correct_answer);
-                    correctAnswers = Array.isArray(parsed)
-                      ? parsed
-                      : [question.correct_answer];
-                  } catch (e) {
-                    correctAnswers = [question.correct_answer];
-                  }
-                } else {
-                  correctAnswers = question.correct_answer;
-                }
-
-                const isCorrect = correctAnswers.some(
-                  (ans) =>
-                    ans.trim().toLowerCase() === option.trim().toLowerCase()
-                );
-
-                return (
-                  <div
-                    key={index}
-                    className={`p-2 rounded flex justify-between items-center ${
-                      isCorrect
-                        ? "bg-green-100 text-green-800"
-                        : "bg-gray-50 text-gray-900"
-                    }`}
-                  >
-                    <span>{option}</span>
-                    {isCorrect && (
-                      <span className="ml-2 text-xs font-semibold text-green-600 uppercase tracking-wide">
-                        Correct
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+              {(question.questionType === "single" ||
+                question.questionType === "multiple") && (
+                <ul className="mt-2 list-disc pl-5">
+                  {question.options.map((option, idx) => (
+                    <li key={idx}>{option}</li>
+                  ))}
+                </ul>
+              )}
+              {(question.questionType === "numerical" ||
+                question.questionType === "fill") && (
+                <p className="mt-2 text-sm">
+                  Answer:{" "}
+                  {Array.isArray(question.correct_answer)
+                    ? question.correct_answer[0]
+                    : question.correct_answer}
+                </p>
+              )}
+              <p className="mt-2 text-sm text-green-600">
+                Correct Answer:{" "}
+                {Array.isArray(question.correct_answer)
+                  ? question.correct_answer.join(", ")
+                  : question.correct_answer}
+              </p>
+              <p className="mt-1 text-sm text-gray-500">
+                Difficulty: {question.difficulty} | Marks: {question.marks}
+              </p>
             </div>
             <div className="flex justify-end items-center gap-4 mt-4">
               <button
@@ -1272,6 +1958,7 @@ function ClassQuestions() {
     </div>
   );
 }
+
 
 function CreateQuiz() {
   const [title, setTitle] = useState("");
@@ -1636,381 +2323,381 @@ function CreateQuiz() {
   );
 }
 
-function QuestionBank() {
-  const user = useAuthStore((state) => state.user);
-  const [classes, setClasses] = useState([]);
-  const [selectedClass, setSelectedClass] = useState(null);
-  const [questions, setQuestions] = useState([]);
-  const [editMode, setEditMode] = useState(null);
+// function QuestionBank() {
+//   const user = useAuthStore((state) => state.user);
+//   const [classes, setClasses] = useState([]);
+//   const [selectedClass, setSelectedClass] = useState(null);
+//   const [questions, setQuestions] = useState([]);
+//   const [editMode, setEditMode] = useState(null);
 
-  const [newQuestion, setNewQuestion] = useState({
-    question: "",
-    options: ["", "", "", ""],
-    correct_answer: [],
-    questionType: "single",
-    difficulty: "medium",
-    marks: "", // new field for marks
-  });
+//   const [newQuestion, setNewQuestion] = useState({
+//     question: "",
+//     options: ["", "", "", ""],
+//     correct_answer: [],
+//     questionType: "single",
+//     difficulty: "medium",
+//     marks: "", // new field for marks
+//   });
 
-  useEffect(() => {
-    if (user) loadClasses();
-  }, [user]);
+//   useEffect(() => {
+//     if (user) loadClasses();
+//   }, [user]);
 
-  useEffect(() => {
-    if (selectedClass) loadQuestions();
-  }, [selectedClass]);
+//   useEffect(() => {
+//     if (selectedClass) loadQuestions();
+//   }, [selectedClass]);
 
-  const loadClasses = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("classes")
-        .select("name")
-        .eq("created_by", user?.id);
+//   const loadClasses = async () => {
+//     try {
+//       const { data, error } = await supabase
+//         .from("classes")
+//         .select("name")
+//         .eq("created_by", user?.id);
 
-      if (error) throw error;
-      const uniqueSubjects = [...new Set(data.map((cls) => cls.name))];
-      setClasses(uniqueSubjects);
-    } catch (err) {
-      console.error("Error loading classes:", err);
-    }
-  };
+//       if (error) throw error;
+//       const uniqueSubjects = [...new Set(data.map((cls) => cls.name))];
+//       setClasses(uniqueSubjects);
+//     } catch (err) {
+//       console.error("Error loading classes:", err);
+//     }
+//   };
 
-  const loadQuestions = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("questions")
-        .select("*")
-        .eq("category", selectedClass);
+//   const loadQuestions = async () => {
+//     try {
+//       const { data, error } = await supabase
+//         .from("questions")
+//         .select("*")
+//         .eq("category", selectedClass);
 
-      if (error) throw error;
+//       if (error) throw error;
 
-      // Ensure options and correct_answer are parsed correctly
-      const formattedQuestions = data.map((question) => ({
-        ...question,
-        options:
-          typeof question.options === "string"
-            ? JSON.parse(question.options)
-            : question.options,
-        correct_answer:
-          typeof question.correct_answer === "string"
-            ? JSON.parse(question.correct_answer)
-            : question.correct_answer,
-      }));
+//       // Ensure options and correct_answer are parsed correctly
+//       const formattedQuestions = data.map((question) => ({
+//         ...question,
+//         options:
+//           typeof question.options === "string"
+//             ? JSON.parse(question.options)
+//             : question.options,
+//         correct_answer:
+//           typeof question.correct_answer === "string"
+//             ? JSON.parse(question.correct_answer)
+//             : question.correct_answer,
+//       }));
 
-      setQuestions(formattedQuestions);
-    } catch (err) {
-      console.error("Error loading questions:", err);
-    }
-  };
+//       setQuestions(formattedQuestions);
+//     } catch (err) {
+//       console.error("Error loading questions:", err);
+//     }
+//   };
 
-  const handleInsertQuestion = async (e) => {
-    e.preventDefault();
-    if (!selectedClass) {
-      alert("Please select a class first.");
-      return;
-    }
+//   const handleInsertQuestion = async (e) => {
+//     e.preventDefault();
+//     if (!selectedClass) {
+//       alert("Please select a class first.");
+//       return;
+//     }
 
-    try {
-      const { error } = await supabase.from("questions").insert([
-        {
-          created_by: user.id,
-          question: newQuestion.question.trim(),
-          options: JSON.stringify(newQuestion.options),
-          correct_answer: JSON.stringify(newQuestion.correct_answer),
-          questionType: newQuestion.questionType,
-          difficulty: newQuestion.difficulty,
-          marks: parseInt(newQuestion.marks, 10), // insert marks
-          category: selectedClass,
-        },
-      ]);
+//     try {
+//       const { error } = await supabase.from("questions").insert([
+//         {
+//           created_by: user.id,
+//           question: newQuestion.question.trim(),
+//           options: JSON.stringify(newQuestion.options),
+//           correct_answer: JSON.stringify(newQuestion.correct_answer),
+//           questionType: newQuestion.questionType,
+//           difficulty: newQuestion.difficulty,
+//           marks: parseInt(newQuestion.marks, 10), // insert marks
+//           category: selectedClass,
+//         },
+//       ]);
 
-      if (error) throw error;
-      alert("Question successfully added.");
-      resetForm();
-      loadQuestions();
-    } catch (err) {
-      console.error("Error inserting question:", err);
-      alert("Failed to add question. Please try again.");
-    }
-  };
+//       if (error) throw error;
+//       alert("Question successfully added.");
+//       resetForm();
+//       loadQuestions();
+//     } catch (err) {
+//       console.error("Error inserting question:", err);
+//       alert("Failed to add question. Please try again.");
+//     }
+//   };
 
-  const handleDeleteQuestion = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this question?")) {
-      return;
-    }
+//   const handleDeleteQuestion = async (id) => {
+//     if (!window.confirm("Are you sure you want to delete this question?")) {
+//       return;
+//     }
 
-    try {
-      const { error } = await supabase.from("questions").delete().eq("id", id);
-      if (error) throw error;
-      alert("Question deleted successfully.");
-      loadQuestions();
-    } catch (err) {
-      console.error("Error deleting question:", err);
-      alert("Failed to delete question. Please try again.");
-    }
-  };
+//     try {
+//       const { error } = await supabase.from("questions").delete().eq("id", id);
+//       if (error) throw error;
+//       alert("Question deleted successfully.");
+//       loadQuestions();
+//     } catch (err) {
+//       console.error("Error deleting question:", err);
+//       alert("Failed to delete question. Please try again.");
+//     }
+//   };
 
-  const handleEditQuestion = (id) => {
-    const updatedQuestion = questions.find((q) => q.id === id);
-    setNewQuestion({
-      question: updatedQuestion.question,
-      options: updatedQuestion.options,
-      correct_answer: updatedQuestion.correct_answer,
-      questionType: updatedQuestion.questionType,
-      difficulty: updatedQuestion.difficulty,
-      marks: updatedQuestion.marks ? updatedQuestion.marks.toString() : "",
-    });
-    setEditMode(id);
-  };
+//   const handleEditQuestion = (id) => {
+//     const updatedQuestion = questions.find((q) => q.id === id);
+//     setNewQuestion({
+//       question: updatedQuestion.question,
+//       options: updatedQuestion.options,
+//       correct_answer: updatedQuestion.correct_answer,
+//       questionType: updatedQuestion.questionType,
+//       difficulty: updatedQuestion.difficulty,
+//       marks: updatedQuestion.marks ? updatedQuestion.marks.toString() : "",
+//     });
+//     setEditMode(id);
+//   };
 
-  const handleUpdateQuestion = async (e) => {
-    e.preventDefault();
-    if (!editMode) return;
+//   const handleUpdateQuestion = async (e) => {
+//     e.preventDefault();
+//     if (!editMode) return;
 
-    try {
-      const { error } = await supabase
-        .from("questions")
-        .update({
-          question: newQuestion.question.trim(),
-          options: JSON.stringify(newQuestion.options),
-          correct_answer: JSON.stringify(newQuestion.correct_answer),
-          questionType: newQuestion.questionType,
-          difficulty: newQuestion.difficulty,
-          marks: parseInt(newQuestion.marks, 10), // update marks
-        })
-        .eq("id", editMode);
+//     try {
+//       const { error } = await supabase
+//         .from("questions")
+//         .update({
+//           question: newQuestion.question.trim(),
+//           options: JSON.stringify(newQuestion.options),
+//           correct_answer: JSON.stringify(newQuestion.correct_answer),
+//           questionType: newQuestion.questionType,
+//           difficulty: newQuestion.difficulty,
+//           marks: parseInt(newQuestion.marks, 10), // update marks
+//         })
+//         .eq("id", editMode);
 
-      if (error) throw error;
+//       if (error) throw error;
 
-      alert("Question updated successfully.");
-      resetForm();
-      loadQuestions();
-    } catch (err) {
-      console.error("Error updating question:", err);
-      alert("Failed to update question. Please try again.");
-    }
-  };
+//       alert("Question updated successfully.");
+//       resetForm();
+//       loadQuestions();
+//     } catch (err) {
+//       console.error("Error updating question:", err);
+//       alert("Failed to update question. Please try again.");
+//     }
+//   };
 
-  const resetForm = () => {
-    setEditMode(null);
-    setNewQuestion({
-      question: "",
-      options: ["", "", "", ""],
-      correct_answer: [],
-      questionType: "single",
-      difficulty: "medium",
-      marks: "",
-    });
-  };
+//   const resetForm = () => {
+//     setEditMode(null);
+//     setNewQuestion({
+//       question: "",
+//       options: ["", "", "", ""],
+//       correct_answer: [],
+//       questionType: "single",
+//       difficulty: "medium",
+//       marks: "",
+//     });
+//   };
 
-  return (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4">Question Bank</h2>
+//   return (
+//     <div className="p-6">
+//       <h2 className="text-2xl font-bold mb-4">Question Bank</h2>
 
-      <div className="mb-4">
-        <label>Select Subject</label>
-        <select
-          value={selectedClass || ""}
-          onChange={(e) => setSelectedClass(e.target.value)}
-          className="block w-full p-2 border border-gray-300 rounded"
-        >
-          <option value="">Select a subject</option>
-          {classes.map((cls, index) => (
-            <option key={index} value={cls}>
-              {cls}
-            </option>
-          ))}
-        </select>
-      </div>
+//       <div className="mb-4">
+//         <label>Select Subject</label>
+//         <select
+//           value={selectedClass || ""}
+//           onChange={(e) => setSelectedClass(e.target.value)}
+//           className="block w-full p-2 border border-gray-300 rounded"
+//         >
+//           <option value="">Select a subject</option>
+//           {classes.map((cls, index) => (
+//             <option key={index} value={cls}>
+//               {cls}
+//             </option>
+//           ))}
+//         </select>
+//       </div>
 
-      {selectedClass && (
-        <>
-          <form
-            onSubmit={editMode ? handleUpdateQuestion : handleInsertQuestion}
-            className="mt-4"
-          >
-            <label>Question:</label>
-            <textarea
-              value={newQuestion.question}
-              onChange={(e) =>
-                setNewQuestion({ ...newQuestion, question: e.target.value })
-              }
-              required
-              className="block w-full p-2 border border-gray-300 rounded"
-            />
+//       {selectedClass && (
+//         <>
+//           <form
+//             onSubmit={editMode ? handleUpdateQuestion : handleInsertQuestion}
+//             className="mt-4"
+//           >
+//             <label>Question:</label>
+//             <textarea
+//               value={newQuestion.question}
+//               onChange={(e) =>
+//                 setNewQuestion({ ...newQuestion, question: e.target.value })
+//               }
+//               required
+//               className="block w-full p-2 border border-gray-300 rounded"
+//             />
 
-            <label>Difficulty:</label>
-            <select
-              value={newQuestion.difficulty}
-              onChange={(e) =>
-                setNewQuestion({ ...newQuestion, difficulty: e.target.value })
-              }
-              className="block w-full p-2 border border-gray-300 rounded"
-            >
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
+//             <label>Difficulty:</label>
+//             <select
+//               value={newQuestion.difficulty}
+//               onChange={(e) =>
+//                 setNewQuestion({ ...newQuestion, difficulty: e.target.value })
+//               }
+//               className="block w-full p-2 border border-gray-300 rounded"
+//             >
+//               <option value="easy">Easy</option>
+//               <option value="medium">Medium</option>
+//               <option value="hard">Hard</option>
+//             </select>
 
-            {/* New: Select Question Type */}
-            <label>Question Type:</label>
-            <select
-              value={newQuestion.questionType}
-              onChange={(e) =>
-                setNewQuestion({
-                  ...newQuestion,
-                  questionType: e.target.value,
-                  correct_answer: [],
-                })
-              }
-              className="block w-full p-2 border border-gray-300 rounded mb-2"
-            >
-              <option value="single">Single Correct Answer</option>
-              <option value="multiple">Multiple Correct Answers</option>
-            </select>
+//             {/* New: Select Question Type */}
+//             <label>Question Type:</label>
+//             <select
+//               value={newQuestion.questionType}
+//               onChange={(e) =>
+//                 setNewQuestion({
+//                   ...newQuestion,
+//                   questionType: e.target.value,
+//                   correct_answer: [],
+//                 })
+//               }
+//               className="block w-full p-2 border border-gray-300 rounded mb-2"
+//             >
+//               <option value="single">Single Correct Answer</option>
+//               <option value="multiple">Multiple Correct Answers</option>
+//             </select>
 
-            {/* New: Marks input */}
-            <label>Marks:</label>
-            <input
-              type="number"
-              value={newQuestion.marks}
-              onChange={(e) =>
-                setNewQuestion({ ...newQuestion, marks: e.target.value })
-              }
-              required
-              className="block w-full p-2 border border-gray-300 rounded mb-2"
-            />
+//             {/* New: Marks input */}
+//             <label>Marks:</label>
+//             <input
+//               type="number"
+//               value={newQuestion.marks}
+//               onChange={(e) =>
+//                 setNewQuestion({ ...newQuestion, marks: e.target.value })
+//               }
+//               required
+//               className="block w-full p-2 border border-gray-300 rounded mb-2"
+//             />
 
-            <label>Options:</label>
-            {newQuestion.options.map((opt, idx) => (
-              <div key={idx} className="mb-2">
-                <input
-                  type="text"
-                  value={opt}
-                  onChange={(e) => {
-                    const updatedOptions = [...newQuestion.options];
-                    updatedOptions[idx] = e.target.value;
-                    setNewQuestion({ ...newQuestion, options: updatedOptions });
-                  }}
-                  required
-                  className="block w-full p-2 border border-gray-300 rounded"
-                />
-                {/* Correct option selection */}
-                <div className="flex items-center mt-1">
-                  {newQuestion.questionType === "single" ? (
-                    <input
-                      type="radio"
-                      name="correctOption"
-                      value={newQuestion.options[idx]}
-                      checked={
-                        newQuestion.correct_answer[0] ===
-                        newQuestion.options[idx]
-                      }
-                      onChange={() =>
-                        setNewQuestion({
-                          ...newQuestion,
-                          correct_answer: [newQuestion.options[idx]],
-                        })
-                      }
-                    />
-                  ) : (
-                    <input
-                      type="checkbox"
-                      value={newQuestion.options[idx]}
-                      checked={newQuestion.correct_answer.includes(
-                        newQuestion.options[idx]
-                      )}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setNewQuestion({
-                            ...newQuestion,
-                            correct_answer: [
-                              ...newQuestion.correct_answer,
-                              newQuestion.options[idx],
-                            ],
-                          });
-                        } else {
-                          setNewQuestion({
-                            ...newQuestion,
-                            correct_answer: newQuestion.correct_answer.filter(
-                              (ans) => ans !== newQuestion.options[idx]
-                            ),
-                          });
-                        }
-                      }}
-                    />
-                  )}
-                  <span className="ml-2 text-sm">Mark as correct</span>
-                </div>
-              </div>
-            ))}
+//             <label>Options:</label>
+//             {newQuestion.options.map((opt, idx) => (
+//               <div key={idx} className="mb-2">
+//                 <input
+//                   type="text"
+//                   value={opt}
+//                   onChange={(e) => {
+//                     const updatedOptions = [...newQuestion.options];
+//                     updatedOptions[idx] = e.target.value;
+//                     setNewQuestion({ ...newQuestion, options: updatedOptions });
+//                   }}
+//                   required
+//                   className="block w-full p-2 border border-gray-300 rounded"
+//                 />
+//                 {/* Correct option selection */}
+//                 <div className="flex items-center mt-1">
+//                   {newQuestion.questionType === "single" ? (
+//                     <input
+//                       type="radio"
+//                       name="correctOption"
+//                       value={newQuestion.options[idx]}
+//                       checked={
+//                         newQuestion.correct_answer[0] ===
+//                         newQuestion.options[idx]
+//                       }
+//                       onChange={() =>
+//                         setNewQuestion({
+//                           ...newQuestion,
+//                           correct_answer: [newQuestion.options[idx]],
+//                         })
+//                       }
+//                     />
+//                   ) : (
+//                     <input
+//                       type="checkbox"
+//                       value={newQuestion.options[idx]}
+//                       checked={newQuestion.correct_answer.includes(
+//                         newQuestion.options[idx]
+//                       )}
+//                       onChange={(e) => {
+//                         if (e.target.checked) {
+//                           setNewQuestion({
+//                             ...newQuestion,
+//                             correct_answer: [
+//                               ...newQuestion.correct_answer,
+//                               newQuestion.options[idx],
+//                             ],
+//                           });
+//                         } else {
+//                           setNewQuestion({
+//                             ...newQuestion,
+//                             correct_answer: newQuestion.correct_answer.filter(
+//                               (ans) => ans !== newQuestion.options[idx]
+//                             ),
+//                           });
+//                         }
+//                       }}
+//                     />
+//                   )}
+//                   <span className="ml-2 text-sm">Mark as correct</span>
+//                 </div>
+//               </div>
+//             ))}
 
-            <button
-              type="submit"
-              className={`mt-4 bg-${
-                editMode ? "blue" : "purple"
-              }-600 text-white px-4 py-2 rounded-md hover:bg-${
-                editMode ? "blue" : "purple"
-              }-700`}
-            >
-              {editMode ? "Update Question" : "Add Question"}
-            </button>
-          </form>
+//             <button
+//               type="submit"
+//               className={`mt-4 bg-${
+//                 editMode ? "blue" : "purple"
+//               }-600 text-white px-4 py-2 rounded-md hover:bg-${
+//                 editMode ? "blue" : "purple"
+//               }-700`}
+//             >
+//               {editMode ? "Update Question" : "Add Question"}
+//             </button>
+//           </form>
 
-          <div className="mt-8">
-            <h3 className="text-xl font-bold mb-2">Existing Questions</h3>
-            {questions.length === 0 ? (
-              <p>No questions available for this subject.</p>
-            ) : (
-              <ul className="space-y-2">
-                {questions.map((question) => (
-                  <li
-                    key={question.id}
-                    className="p-4 bg-white border border-gray-200 rounded-lg"
-                  >
-                    <p className="font-semibold">{question.question}</p>
-                    <ul className="mt-2 list-disc pl-5">
-                      {question.options.map((option, idx) => (
-                        <li key={idx}>{option}</li>
-                      ))}
-                    </ul>
-                    <p className="mt-2 text-sm text-green-600">
-                      Correct Answer:{" "}
-                      {Array.isArray(question.correct_answer)
-                        ? question.correct_answer.join(", ")
-                        : question.correct_answer}
-                    </p>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Difficulty: {question.difficulty} | Marks:{" "}
-                      {question.marks}
-                    </p>
-                    {/* Edit and Delete Buttons */}
-                    <div className="flex gap-4 mt-2">
-                      <button
-                        type="button"
-                        onClick={() => handleEditQuestion(question.id)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteQuestion(question.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
+//           <div className="mt-8">
+//             <h3 className="text-xl font-bold mb-2">Existing Questions</h3>
+//             {questions.length === 0 ? (
+//               <p>No questions available for this subject.</p>
+//             ) : (
+//               <ul className="space-y-2">
+//                 {questions.map((question) => (
+//                   <li
+//                     key={question.id}
+//                     className="p-4 bg-white border border-gray-200 rounded-lg"
+//                   >
+//                     <p className="font-semibold">{question.question}</p>
+//                     <ul className="mt-2 list-disc pl-5">
+//                       {question.options.map((option, idx) => (
+//                         <li key={idx}>{option}</li>
+//                       ))}
+//                     </ul>
+//                     <p className="mt-2 text-sm text-green-600">
+//                       Correct Answer:{" "}
+//                       {Array.isArray(question.correct_answer)
+//                         ? question.correct_answer.join(", ")
+//                         : question.correct_answer}
+//                     </p>
+//                     <p className="mt-1 text-sm text-gray-500">
+//                       Difficulty: {question.difficulty} | Marks:{" "}
+//                       {question.marks}
+//                     </p>
+//                     {/* Edit and Delete Buttons */}
+//                     <div className="flex gap-4 mt-2">
+//                       <button
+//                         type="button"
+//                         onClick={() => handleEditQuestion(question.id)}
+//                         className="text-blue-600 hover:text-blue-800"
+//                       >
+//                         Edit
+//                       </button>
+//                       <button
+//                         type="button"
+//                         onClick={() => handleDeleteQuestion(question.id)}
+//                         className="text-red-600 hover:text-red-800"
+//                       >
+//                         Delete
+//                       </button>
+//                     </div>
+//                   </li>
+//                 ))}
+//               </ul>
+//             )}
+//           </div>
+//         </>
+//       )}
+//     </div>
+//   );
+// }
 
 // function QuizList() {
 //   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -2122,6 +2809,493 @@ function QuestionBank() {
 //     </div>
 //   );
 // }
+
+function QuestionBank() {
+  const user = useAuthStore((state) => state.user);
+  const [classes, setClasses] = useState([]);
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [questions, setQuestions] = useState([]);
+  const [editMode, setEditMode] = useState(null);
+  // currentPage can be: "subject", "list", "type", or "form"
+  const [currentPage, setCurrentPage] = useState("subject");
+
+  const [newQuestion, setNewQuestion] = useState({
+    question: "",
+    options: ["", "", "", ""],
+    correct_answer: [],
+    questionType: "single",
+    difficulty: "medium",
+    marks: "",
+  });
+
+  useEffect(() => {
+    if (user) loadClasses();
+  }, [user]);
+
+  const loadClasses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("classes")
+        .select("name")
+        .eq("created_by", user?.id);
+      if (error) throw error;
+      const uniqueSubjects = [...new Set(data.map((cls) => cls.name))];
+      setClasses(uniqueSubjects);
+    } catch (err) {
+      console.error("Error loading classes:", err);
+    }
+  };
+
+  const loadQuestions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("questions")
+        .select("*")
+        .eq("category", selectedSubject);
+      if (error) throw error;
+      const formattedQuestions = data.map((question) => ({
+        ...question,
+        options:
+          typeof question.options === "string"
+            ? JSON.parse(question.options)
+            : question.options,
+        correct_answer:
+          typeof question.correct_answer === "string"
+            ? JSON.parse(question.correct_answer)
+            : question.correct_answer,
+      }));
+      setQuestions(formattedQuestions);
+    } catch (err) {
+      console.error("Error loading questions:", err);
+    }
+  };
+
+  const handleInsertQuestion = async (e) => {
+    e.preventDefault();
+    if (!selectedSubject) {
+      alert("Please select a subject first.");
+      return;
+    }
+    try {
+      const { error } = await supabase.from("questions").insert([
+        {
+          created_by: user.id,
+          question: newQuestion.question.trim(),
+          // For types numerical or fill, use an empty array instead of null
+          options:
+            newQuestion.questionType === "single" ||
+            newQuestion.questionType === "multiple"
+              ? JSON.stringify(newQuestion.options)
+              : JSON.stringify([]),
+          correct_answer: JSON.stringify(newQuestion.correct_answer),
+          questionType: newQuestion.questionType,
+          difficulty: newQuestion.difficulty,
+          marks: parseInt(newQuestion.marks, 10),
+          category: selectedSubject,
+        },
+      ]);
+      if (error) throw error;
+      alert("Question successfully added.");
+      resetForm();
+      loadQuestions();
+      setCurrentPage("list");
+    } catch (err) {
+      console.error("Error inserting question:", err);
+      alert("Failed to add question. Please try again.");
+    }
+  };
+
+  const handleDeleteQuestion = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this question?")) {
+      return;
+    }
+    try {
+      const { error } = await supabase.from("questions").delete().eq("id", id);
+      if (error) throw error;
+      alert("Question deleted successfully.");
+      loadQuestions();
+    } catch (err) {
+      console.error("Error deleting question:", err);
+      alert("Failed to delete question. Please try again.");
+    }
+  };
+
+  const handleEditQuestion = (id) => {
+    const updatedQuestion = questions.find((q) => q.id === id);
+    setNewQuestion({
+      question: updatedQuestion.question,
+      options: updatedQuestion.options || ["", "", "", ""],
+      correct_answer: updatedQuestion.correct_answer,
+      questionType: updatedQuestion.questionType,
+      difficulty: updatedQuestion.difficulty,
+      marks: updatedQuestion.marks ? updatedQuestion.marks.toString() : "",
+    });
+    setEditMode(id);
+    setCurrentPage("form");
+  };
+
+  const handleUpdateQuestion = async (e) => {
+    e.preventDefault();
+    if (!editMode) return;
+    try {
+      const { error } = await supabase
+        .from("questions")
+        .update({
+          question: newQuestion.question.trim(),
+          options:
+            newQuestion.questionType === "single" ||
+            newQuestion.questionType === "multiple"
+              ? JSON.stringify(newQuestion.options)
+              : JSON.stringify([]), // Changed from null to JSON.stringify([])
+          correct_answer: JSON.stringify(newQuestion.correct_answer),
+          questionType: newQuestion.questionType,
+          difficulty: newQuestion.difficulty,
+          marks: parseInt(newQuestion.marks, 10),
+        })
+        .eq("id", editMode);
+      if (error) throw error;
+      alert("Question updated successfully.");
+      resetForm();
+      loadQuestions();
+      setCurrentPage("list");
+    } catch (err) {
+      console.error("Error updating question:", err);
+      alert("Failed to update question. Please try again.");
+    }
+  };
+
+  const resetForm = () => {
+    setEditMode(null);
+    setNewQuestion({
+      question: "",
+      options: ["", "", "", ""],
+      correct_answer: [],
+      questionType: "single",
+      difficulty: "medium",
+      marks: "",
+    });
+  };
+
+  // Render based on currentPage
+  if (currentPage === "subject") {
+    return (
+      <div className="p-6">
+        <h2 className="text-2xl font-bold mb-4">Select Subject</h2>
+        <div className="mb-4">
+          <select
+            value={selectedSubject}
+            onChange={(e) => setSelectedSubject(e.target.value)}
+            className="block w-full p-2 border border-gray-300 rounded"
+          >
+            <option value="">Select a subject</option>
+            {classes.map((cls, index) => (
+              <option key={index} value={cls}>
+                {cls}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          onClick={() => {
+            if (!selectedSubject) {
+              alert("Please select a subject.");
+            } else {
+              loadQuestions();
+              setCurrentPage("list");
+            }
+          }}
+          className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+        >
+          Continue
+        </button>
+      </div>
+    );
+  } else if (currentPage === "list") {
+    return (
+      <div className="p-6 relative">
+        <h2 className="text-2xl font-bold mb-4">
+          Questions for {selectedSubject}
+        </h2>
+        <button
+          onClick={() => setCurrentPage("type")}
+          className="absolute top-6 right-6 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+        >
+          Add Question
+        </button>
+        {questions.length === 0 ? (
+          <p>No questions available for this subject.</p>
+        ) : (
+          <ul className="space-y-4">
+            {questions.map((question) => (
+              <li
+                key={question.id}
+                className="p-4 bg-white border border-gray-200 rounded-lg"
+              >
+                <p className="font-semibold">{question.question}</p>
+                {(question.questionType === "single" ||
+                  question.questionType === "multiple") && (
+                  <ul className="mt-2 list-disc pl-5">
+                    {question.options.map((option, idx) => (
+                      <li key={idx}>{option}</li>
+                    ))}
+                  </ul>
+                )}
+                {(question.questionType === "numerical" ||
+                  question.questionType === "fill") && (
+                  <p className="mt-2 text-sm">
+                    Answer:{" "}
+                    {Array.isArray(question.correct_answer)
+                      ? question.correct_answer[0]
+                      : question.correct_answer}
+                  </p>
+                )}
+                <p className="mt-2 text-sm text-green-600">
+                  Correct Answer:{" "}
+                  {Array.isArray(question.correct_answer)
+                    ? question.correct_answer.join(", ")
+                    : question.correct_answer}
+                </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  Difficulty: {question.difficulty} | Marks: {question.marks}
+                </p>
+                <div className="flex gap-4 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleEditQuestion(question.id)}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteQuestion(question.id)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <button
+          onClick={() => setCurrentPage("subject")}
+          className="mt-4 bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+        >
+          Back to Subjects
+        </button>
+      </div>
+    );
+  } else if (currentPage === "type") {
+    return (
+      <div className="p-6">
+        <h2 className="text-2xl font-bold mb-4">Select Question Type</h2>
+        <div className="grid grid-cols-2 gap-4">
+          <button
+            onClick={() => {
+              setNewQuestion({ ...newQuestion, questionType: "single" });
+              setCurrentPage("form");
+            }}
+            className="bg-slate-500 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            Single Correct Answer
+          </button>
+          <button
+            onClick={() => {
+              setNewQuestion({ ...newQuestion, questionType: "multiple" });
+              setCurrentPage("form");
+            }}
+            className="bg-slate-500 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            Multiple Correct Answers
+          </button>
+          <button
+            onClick={() => {
+              setNewQuestion({ ...newQuestion, questionType: "numerical" });
+              setCurrentPage("form");
+            }}
+            className="bg-slate-500 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            Numerical
+          </button>
+          <button
+            onClick={() => {
+              setNewQuestion({ ...newQuestion, questionType: "fill" });
+              setCurrentPage("form");
+            }}
+            className="bg-slate-500 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            Fill in the Blank
+          </button>
+        </div>
+        <button
+          onClick={() => setCurrentPage("list")}
+          className="mt-4 bg-blue-700 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  } else if (currentPage === "form") {
+    return (
+      <div className="p-6">
+        <h2 className="text-2xl font-bold mb-4">
+          {editMode ? "Edit Question" : "Add Question"} (
+          {newQuestion.questionType.charAt(0).toUpperCase() +
+            newQuestion.questionType.slice(1)}
+          )
+        </h2>
+        <form onSubmit={editMode ? handleUpdateQuestion : handleInsertQuestion}>
+          <label className="block mb-2">Question:</label>
+          <textarea
+            value={newQuestion.question}
+            onChange={(e) =>
+              setNewQuestion({ ...newQuestion, question: e.target.value })
+            }
+            required
+            className="block w-full p-2 border border-gray-300 rounded mb-4"
+          />
+
+          <label className="block mb-2">Difficulty:</label>
+          <select
+            value={newQuestion.difficulty}
+            onChange={(e) =>
+              setNewQuestion({ ...newQuestion, difficulty: e.target.value })
+            }
+            className="block w-full p-2 border border-gray-300 rounded mb-4"
+          >
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+
+          <label className="block mb-2">Marks:</label>
+          <input
+            type="number"
+            value={newQuestion.marks}
+            onChange={(e) =>
+              setNewQuestion({ ...newQuestion, marks: e.target.value })
+            }
+            required
+            className="block w-full p-2 border border-gray-300 rounded mb-4"
+          />
+
+          {newQuestion.questionType === "single" ||
+          newQuestion.questionType === "multiple" ? (
+            <>
+              <label className="block mb-2">Options:</label>
+              {newQuestion.options.map((opt, idx) => (
+                <div key={idx} className="mb-2">
+                  <input
+                    type="text"
+                    value={opt}
+                    onChange={(e) => {
+                      const updatedOptions = [...newQuestion.options];
+                      updatedOptions[idx] = e.target.value;
+                      setNewQuestion({
+                        ...newQuestion,
+                        options: updatedOptions,
+                      });
+                    }}
+                    required
+                    className="block w-full p-2 border border-gray-300 rounded"
+                  />
+                  <div className="flex items-center mt-1">
+                    {newQuestion.questionType === "single" ? (
+                      <input
+                        type="radio"
+                        name="correctOption"
+                        value={newQuestion.options[idx]}
+                        checked={
+                          newQuestion.correct_answer[0] ===
+                          newQuestion.options[idx]
+                        }
+                        onChange={() =>
+                          setNewQuestion({
+                            ...newQuestion,
+                            correct_answer: [newQuestion.options[idx]],
+                          })
+                        }
+                      />
+                    ) : (
+                      <input
+                        type="checkbox"
+                        value={newQuestion.options[idx]}
+                        checked={newQuestion.correct_answer.includes(
+                          newQuestion.options[idx]
+                        )}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setNewQuestion({
+                              ...newQuestion,
+                              correct_answer: [
+                                ...newQuestion.correct_answer,
+                                newQuestion.options[idx],
+                              ],
+                            });
+                          } else {
+                            setNewQuestion({
+                              ...newQuestion,
+                              correct_answer: newQuestion.correct_answer.filter(
+                                (ans) => ans !== newQuestion.options[idx]
+                              ),
+                            });
+                          }
+                        }}
+                      />
+                    )}
+                    <span className="ml-2 text-sm">Mark as correct</span>
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : (
+            <div className="mb-4">
+              <label className="block mb-2">Answer:</label>
+              <input
+                type="text"
+                value={newQuestion.correct_answer[0] || ""}
+                onChange={(e) =>
+                  setNewQuestion({
+                    ...newQuestion,
+                    correct_answer: [e.target.value],
+                  })
+                }
+                required
+                className="block w-full p-2 border border-gray-300 rounded"
+              />
+            </div>
+          )}
+
+          <div className="flex gap-4 mt-4">
+            <button
+              type="submit"
+              className={`bg-${
+                editMode ? "blue" : "purple"
+              }-600 text-white px-4 py-2 rounded-md hover:bg-${
+                editMode ? "blue" : "purple"
+              }-700`}
+            >
+              {editMode ? "Update Question" : "Add Question"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                resetForm();
+                setCurrentPage("list");
+              }}
+              className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  return null;
+}
 
 function QuizList() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -2267,10 +3441,13 @@ export default function TeacherDashboard() {
           />
           <Route path="/classes" element={<Classes />} />
           <Route path="/classes/:classId" element={<ClassQuestions />} />
+          <Route path="/classes/:classId/members" element={<ClassMembers />} />
           <Route path="/quizzes" element={<QuizList />} />
           <Route path="/quizzes/create" element={<CreateQuiz />} />
-          <Route path="/stats" element={<Statistics />} />
+          <Route path="/students/:studentId/report" element={<StudentReport />}/>
+          {/* <Route path="/stats" element={<Statistics />} /> */}
           <Route path="/question-bank" element={<QuestionBank />} />
+          {/* <Route path="/students" element={<StudentList />} /> */}
         </Routes>
       </div>
     </div>
