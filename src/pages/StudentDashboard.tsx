@@ -237,6 +237,339 @@ function ClassDetails() {
   );
 }
 
+// function TakeQuiz() {
+//   const { quizId } = useParams<{ quizId: string }>();
+//   const [quiz, setQuiz] = useState<Quiz | null>(null);
+//   const [questions, setQuestions] = useState<Question[]>([]);
+//   const [currentQuestion, setCurrentQuestion] = useState(0);
+//   // Store answers as an object mapping question IDs to an array of selected options.
+//   const [answers, setAnswers] = useState<Record<string, string[]>>({});
+//   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+//   const [hasAttempted, setHasAttempted] = useState(false);
+//   const navigate = useNavigate();
+//   const user = useAuthStore((state) => state.user);
+
+//   useEffect(() => {
+//     if (quizId && user) {
+//       checkPreviousAttempt();
+//       loadQuiz();
+//     }
+//   }, [quizId, user]);
+
+//   const checkPreviousAttempt = async () => {
+//     if (!user || !quizId) return;
+//     try {
+//       // Using maybeSingle() so that if no attempt exists, it returns null without error.
+//       const { data, error } = await supabase
+//         .from("quiz_attempts")
+//         .select("id")
+//         .eq("quiz_id", quizId)
+//         .eq("user_id", user.id)
+//         .maybeSingle();
+//       if (data) {
+//         setHasAttempted(true);
+//       }
+//       if (error && error.code !== "PGRST116") {
+//         console.error("Error checking quiz attempt:", error);
+//       }
+//     } catch (err) {
+//       console.error("Error in checkPreviousAttempt:", err);
+//     }
+//   };
+
+//   const loadQuiz = async () => {
+//     try {
+//       const { data: quizData, error } = await supabase
+//         .from("quizzes")
+//         .select("*")
+//         .eq("id", quizId)
+//         .maybeSingle();
+
+//       if (error) throw error;
+
+//       if (quizData) {
+//         setQuiz(quizData);
+//         // Set initial timer value in seconds.
+//         setTimeLeft(quizData.time_limit * 60);
+
+//         // Load questions using the array of question IDs stored in quizData.questions.
+//         const { data: questionData, error: questionError } = await supabase
+//           .from("questions")
+//           .select("id, question, options, correct_answer, questionType, marks")
+//           .in("id", quizData.questions);
+
+//         if (questionError) throw questionError;
+
+//         if (questionData) {
+//           const formattedQuestions = questionData.map((q) => ({
+//             ...q,
+//             options:
+//               typeof q.options === "string" ? JSON.parse(q.options) : q.options,
+//             correct_answer:
+//               typeof q.correct_answer === "string"
+//                 ? JSON.parse(q.correct_answer)
+//                 : q.correct_answer,
+//           }));
+//           setQuestions(formattedQuestions);
+//         }
+//       }
+//     } catch (err) {
+//       console.error("Error loading quiz:", err);
+//     }
+//   };
+
+//   // Timer effect: decrement the timer every second and auto-submit when time runs out.
+//   useEffect(() => {
+//     if (quiz && timeLeft !== null) {
+//       const interval = setInterval(() => {
+//         setTimeLeft((prevTime) => {
+//           if (prevTime !== null) {
+//             if (prevTime <= 1) {
+//               clearInterval(interval);
+//               handleSubmit();
+//               return 0;
+//             }
+//             return prevTime - 1;
+//           }
+//           return null;
+//         });
+//       }, 1000);
+//       return () => clearInterval(interval);
+//     }
+//   }, [quiz, timeLeft !== null]);
+
+//   const handleAnswer = (option: string) => {
+//     const question = questions[currentQuestion];
+//     const qid = question.id;
+//     const currentAns = answers[qid] || [];
+
+//     if (question.questionType === "multiple") {
+//       // Toggle the option for multiple-correct questions.
+//       if (currentAns.includes(option)) {
+//         setAnswers({
+//           ...answers,
+//           [qid]: currentAns.filter((ans) => ans !== option),
+//         });
+//       } else {
+//         setAnswers({
+//           ...answers,
+//           [qid]: [...currentAns, option],
+//         });
+//       }
+//     } else {
+//       // For single correct questions, replace any previous answer.
+//       setAnswers({
+//         ...answers,
+//         [qid]: [option],
+//       });
+//     }
+//   };
+
+//   // Helper function to normalize answers
+//   const normalizeAnswer = (answer: string) => answer.trim().toLowerCase();
+
+//   const handleSubmit = async () => {
+//     if (hasAttempted) {
+//       alert("You have already attempted this quiz.");
+//       return;
+//     }
+//     if (!quiz || !user) return;
+
+//     let score = 0;
+//     let totalMarks = 0;
+
+//     questions.forEach((question) => {
+//       const questionMarks = Number(question.marks) || 0;
+//       totalMarks += questionMarks;
+//       const given = answers[question.id] || [];
+
+//       if (question.questionType === "multiple") {
+//         let correct = question.correct_answer;
+//         if (typeof correct === "string" && correct.trim().startsWith("[")) {
+//           try {
+//             correct = JSON.parse(correct);
+//           } catch (error) {
+//             console.error("Error parsing correct_answer:", error);
+//           }
+//         }
+//         if (Array.isArray(correct)) {
+//           const normalizedCorrect = correct
+//             .map((a: string) => a.trim().toLowerCase())
+//             .sort();
+//           const normalizedGiven = given
+//             .map((a: string) => a.trim().toLowerCase())
+//             .sort();
+//           if (
+//             normalizedGiven.length === normalizedCorrect.length &&
+//             normalizedGiven.every(
+//               (ans, index) => ans === normalizedCorrect[index]
+//             )
+//           ) {
+//             score += questionMarks;
+//           }
+//         }
+//       } else {
+//         let correct = question.correct_answer;
+//         if (typeof correct === "string" && correct.trim().startsWith("[")) {
+//           try {
+//             correct = JSON.parse(correct);
+//           } catch (error) {
+//             console.error(
+//               "Error parsing correct_answer for single correct question:",
+//               error
+//             );
+//           }
+//         }
+//         if (Array.isArray(correct)) {
+//           correct = correct[0];
+//         }
+//         if (
+//           given[0] &&
+//           given[0].trim().toLowerCase() === String(correct).trim().toLowerCase()
+//         ) {
+//           score += questionMarks;
+//         }
+//       }
+//     });
+
+//     console.log("Calculated Score:", score, "Total Marks:", totalMarks);
+
+//     try {
+//       const { data, error } = await supabase
+//         .from("quiz_attempts")
+//         .insert([
+//           {
+//             quiz_id: quiz.id,
+//             user_id: user.id,
+//             score: Number(score),
+//             answers,
+//             completed_at: new Date(),
+//           },
+//         ])
+//         .select(); // returning the inserted row for debugging
+
+//       if (error) {
+//         console.error("Insert error:", error);
+//         throw error;
+//       }
+
+//       console.log("Inserted attempt data:", data);
+//       navigate("/student/history");
+//     } catch (error) {
+//       console.error("Error submitting quiz:", error);
+//       alert("Failed to submit quiz. Please try again.");
+//     }
+//   };
+
+//   if (hasAttempted) {
+//     return (
+//       <div className="p-6 max-w-3xl mx-auto">
+//         <div className="bg-red-100 border border-red-300 text-red-800 p-6 rounded-lg text-center">
+//           <p className="text-xl font-bold mb-4">
+//             You have already attempted this quiz.
+//           </p>
+//           <p className="mb-6">You cannot attempt it again.</p>
+//           <button
+//             onClick={() => navigate("/student/history")}
+//             className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700"
+//           >
+//             View Quiz History
+//           </button>
+//         </div>
+//       </div>
+//     );
+//   }
+
+//   if (!quiz || questions.length === 0) return null;
+
+//   const question = questions[currentQuestion];
+//   const minutes = Math.floor((timeLeft || 0) / 60);
+//   const seconds = (timeLeft || 0) % 60;
+
+//   return (
+//     <div className="p-6 max-w-3xl mx-auto">
+//       <div className="bg-white rounded-lg shadow-lg p-6">
+//         <div className="flex justify-between items-center mb-6">
+//           <h2 className="text-2xl font-bold text-gray-900">{quiz.title}</h2>
+//           <div className="flex items-center gap-2 text-purple-600">
+//             <Clock className="w-5 h-5" />
+//             {minutes}:{seconds.toString().padStart(2, "0")}
+//           </div>
+//         </div>
+
+//         <div className="mb-6">
+//           <div className="text-sm text-gray-500 mb-2">
+//             Question {currentQuestion + 1} of {questions.length}
+//           </div>
+//           <div className="w-full bg-gray-200 rounded-full h-2">
+//             <div
+//               className="bg-purple-600 rounded-full h-2"
+//               style={{
+//                 width: `${((currentQuestion + 1) / questions.length) * 100}%`,
+//               }}
+//             />
+//           </div>
+//         </div>
+
+//         <div className="mb-4">
+//           <h3 className="text-lg font-medium text-gray-900">
+//             {question.question}
+//           </h3>
+//           <p className="text-sm text-gray-500">Marks: {question.marks}</p>
+//           <p className="text-sm text-gray-500">Type: {question.questionType}</p>
+//         </div>
+
+//         <div className="space-y-3">
+//           {question.options.map((option, index) => {
+//             const selected = answers[question.id]?.includes(option);
+//             return (
+//               <button
+//                 key={index}
+//                 onClick={() => handleAnswer(option)}
+//                 className={`w-full p-3 text-left rounded-lg border ${
+//                   selected
+//                     ? "border-purple-600 bg-purple-50"
+//                     : "border-gray-300 hover:border-purple-600"
+//                 }`}
+//               >
+//                 {option}
+//               </button>
+//             );
+//           })}
+//         </div>
+
+//         <div className="mt-6 flex justify-between">
+//           <button
+//             onClick={() => setCurrentQuestion(currentQuestion - 1)}
+//             disabled={currentQuestion === 0}
+//             className="px-4 py-2 text-purple-600 disabled:text-gray-400"
+//           >
+//             Previous
+//           </button>
+//           {currentQuestion === questions.length - 1 ? (
+//             <button
+//               onClick={handleSubmit}
+//               className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700"
+//             >
+//               Submit
+//             </button>
+//           ) : (
+//             <button
+//               onClick={() => setCurrentQuestion(currentQuestion + 1)}
+//               disabled={
+//                 !answers[question.id] || answers[question.id].length === 0
+//               }
+//               className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400"
+//             >
+//               Next
+//             </button>
+//           )}
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+
 function TakeQuiz() {
   const { quizId } = useParams<{ quizId: string }>();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -259,12 +592,13 @@ function TakeQuiz() {
   const checkPreviousAttempt = async () => {
     if (!user || !quizId) return;
     try {
+      // Using maybeSingle() so that if no attempt exists, it returns null without error.
       const { data, error } = await supabase
         .from("quiz_attempts")
         .select("id")
         .eq("quiz_id", quizId)
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
       if (data) {
         setHasAttempted(true);
       }
@@ -278,25 +612,44 @@ function TakeQuiz() {
 
   const loadQuiz = async () => {
     try {
-      const { data: quizData } = await supabase
+      const { data: quizData, error } = await supabase
         .from("quizzes")
         .select("*")
         .eq("id", quizId)
-        .single();
+        .maybeSingle();
+
+      if (error) throw error;
 
       if (quizData) {
+        // Check if the quiz is released.
+        if (!quizData.release_quiz) {
+          alert("This quiz is not released yet.");
+          navigate("/student");
+          return;
+        }
         setQuiz(quizData);
         // Set initial timer value in seconds.
         setTimeLeft(quizData.time_limit * 60);
 
         // Load questions using the array of question IDs stored in quizData.questions.
-        const { data: questionData } = await supabase
+        const { data: questionData, error: questionError } = await supabase
           .from("questions")
           .select("id, question, options, correct_answer, questionType, marks")
           .in("id", quizData.questions);
 
+        if (questionError) throw questionError;
+
         if (questionData) {
-          setQuestions(questionData);
+          const formattedQuestions = questionData.map((q) => ({
+            ...q,
+            options:
+              typeof q.options === "string" ? JSON.parse(q.options) : q.options,
+            correct_answer:
+              typeof q.correct_answer === "string"
+                ? JSON.parse(q.correct_answer)
+                : q.correct_answer,
+          }));
+          setQuestions(formattedQuestions);
         }
       }
     } catch (err) {
@@ -322,7 +675,7 @@ function TakeQuiz() {
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [quiz, timeLeft !== null]);
+  }, [quiz, timeLeft]);
 
   const handleAnswer = (option: string) => {
     const question = questions[currentQuestion];
@@ -351,64 +704,9 @@ function TakeQuiz() {
     }
   };
 
-  // const handleSubmit = async () => {
-  //   if (hasAttempted) {
-  //     alert("You have already attempted this quiz.");
-  //     return;
-  //   }
-  //   if (!quiz || !user) return;
-
-  //   let score = 0;
-  //   let totalMarks = 0;
-
-  //   questions.forEach((question) => {
-  //     const questionMarks = Number(question.marks) || 0;
-  //     totalMarks += questionMarks;
-
-  //     const given = answers[question.id] || [];
-
-  //     if (question.questionType === "multiple") {
-  //       // For multiple-correct questions, assume correct_answer is stored as an array.
-  //       const correct = question.correct_answer;
-  //       if (
-  //         Array.isArray(correct) &&
-  //         given.length === correct.length &&
-  //         given.every((ans) => correct.includes(ans))
-  //       ) {
-  //         score += questionMarks;
-  //       }
-  //     } else {
-  //       // For single-correct questions, correct_answer is a string.
-  //       if (given[0] === question.correct_answer) {
-  //         score += questionMarks;
-  //       }
-  //     }
-  //   });
-
-  //   // Display the score to the user.
-  //   alert(`Your score: ${score} out of ${totalMarks}`);
-
-  //   try {
-  //     const { error } = await supabase.from("quiz_attempts").insert([
-  //       {
-  //         quiz_id: quiz.id,
-  //         user_id: user.id,
-  //         score, // This value now represents the total marks scored.
-  //         answers, // Object mapping question IDs to arrays of selected answers.
-  //         completed_at: new Date(),
-  //       },
-  //     ]);
-  //     if (error) throw error;
-  //     navigate("/student/history");
-  //   } catch (error) {
-  //     console.error("Error submitting quiz:", error);
-  //     alert("Failed to submit quiz. Please try again.");
-  //   }
-  // };
-  // In TakeQuiz.tsx
-
   // Helper function to normalize answers
   const normalizeAnswer = (answer: string) => answer.trim().toLowerCase();
+
   const handleSubmit = async () => {
     if (hasAttempted) {
       alert("You have already attempted this quiz.");
@@ -473,7 +771,6 @@ function TakeQuiz() {
       }
     });
 
-    // Debug: Log the calculated score
     console.log("Calculated Score:", score, "Total Marks:", totalMarks);
 
     try {
@@ -483,7 +780,7 @@ function TakeQuiz() {
           {
             quiz_id: quiz.id,
             user_id: user.id,
-            score: Number(score), // explicitly setting as number
+            score: Number(score),
             answers,
             completed_at: new Date(),
           },
@@ -495,16 +792,13 @@ function TakeQuiz() {
         throw error;
       }
 
-      // Debug: Log the returned inserted data to verify the score field
       console.log("Inserted attempt data:", data);
-
       navigate("/student/history");
     } catch (error) {
       console.error("Error submitting quiz:", error);
       alert("Failed to submit quiz. Please try again.");
     }
   };
-
 
   if (hasAttempted) {
     return (
@@ -661,12 +955,30 @@ function QuizHistory() {
     try {
       const { data, error } = await supabase
         .from("questions")
-        .select("id, question, options, correct_answer, questionType")
+        .select("id, question, options, correct_answer, questionType, marks")
         .in("id", questionIds);
       if (error) throw error;
       if (data) {
+        // Parse the options and correct_answer fields if they are strings.
         const questionMap = data.reduce((acc, q) => {
-          acc[q.id] = q;
+          const parsedOptions =
+            typeof q.options === "string" ? JSON.parse(q.options) : q.options;
+          let parsedCorrectAnswer = q.correct_answer;
+          if (
+            typeof q.correct_answer === "string" &&
+            q.correct_answer.trim().startsWith("[")
+          ) {
+            try {
+              parsedCorrectAnswer = JSON.parse(q.correct_answer);
+            } catch (err) {
+              console.error("Error parsing correct_answer:", err);
+            }
+          }
+          acc[q.id] = {
+            ...q,
+            options: parsedOptions,
+            correct_answer: parsedCorrectAnswer,
+          };
           return acc;
         }, {});
         setQuestions(questionMap);
@@ -705,307 +1017,155 @@ function QuizHistory() {
     );
   }
 
-  // return (
-  //   <div className="p-6">
-  //     <h2 className="text-2xl font-bold text-gray-900 mb-6">My Results</h2>
-  //     <div className="grid gap-4">
-  //       {attempts.map((attempt) => (
-  //         <div key={attempt.id} className="bg-white p-4 rounded-lg shadow">
-  //           <div className="flex justify-between items-start">
-  //             <div>
-  //               <h3 className="text-lg font-medium text-gray-900">
-  //                 {attempt.quiz?.title}
-  //               </h3>
-  //               <p className="text-gray-500">
-  //                 Completed on{" "}
-  //                 {new Date(attempt.completed_at).toLocaleDateString()}
-  //               </p>
-  //               {/* Display the score here */}
-  //               <p className="text-gray-500">Score: {attempt.score}</p>
-  //             </div>
-  //             <div className="flex items-center gap-2">
-  //               {attempt.quiz && attempt.quiz.answers_released && (
-  //                 <button
-  //                   onClick={() =>
-  //                     setSelectedAttempt(
-  //                       selectedAttempt?.id === attempt.id ? null : attempt
-  //                     )
-  //                   }
-  //                   className="mt-2 text-purple-600 hover:text-purple-800"
-  //                 >
-  //                   {selectedAttempt?.id === attempt.id
-  //                     ? "Hide Details"
-  //                     : "View Details"}
-  //                 </button>
-  //               )}
-  //             </div>
-  //           </div>
-
-  //           {selectedAttempt?.id === attempt.id &&
-  //             Object.keys(questions).length > 0 && (
-  //               <div className="mt-4 space-y-4">
-  //                 {attempt.quiz.questions.map((questionId) => {
-  //                   const question = questions[questionId];
-  //                   if (!question) return null;
-
-  //                   // Parse answers if stored as a JSON string.
-  //                   let answersData = attempt.answers;
-  //                   if (typeof answersData === "string") {
-  //                     try {
-  //                       answersData = JSON.parse(answersData);
-  //                     } catch (err) {
-  //                       console.error("Error parsing answers:", err);
-  //                       answersData = {};
-  //                     }
-  //                   }
-  //                   const userAns = answersData[questionId] || [];
-
-  //                   // Ensure the correct_answer data is in the right format.
-  //                   let correctAnswerData = question.correct_answer;
-  //                   if (
-  //                     typeof correctAnswerData === "string" &&
-  //                     correctAnswerData.trim().startsWith("[")
-  //                   ) {
-  //                     try {
-  //                       correctAnswerData = JSON.parse(correctAnswerData);
-  //                     } catch (err) {
-  //                       console.error("Error parsing correct_answer:", err);
-  //                     }
-  //                   }
-  //                   const correctAnswers = (
-  //                     Array.isArray(correctAnswerData)
-  //                       ? correctAnswerData
-  //                       : [correctAnswerData]
-  //                   ).map(normalize);
-
-  //                   return (
-  //                     <div key={questionId} className="border rounded-lg p-4">
-  //                       <p className="font-medium text-gray-900">
-  //                         {question.question}
-  //                       </p>
-  //                       <div className="mt-2 space-y-2">
-  //                         {question.options.map((option, index) => {
-  //                           const normalizedOption = normalize(option);
-  //                           const normalizedUserAns = (
-  //                             Array.isArray(userAns) ? userAns : [userAns]
-  //                           ).map(normalize);
-
-  //                           // Determine if this option is the correct answer.
-  //                           const isCorrect =
-  //                             correctAnswers.includes(normalizedOption);
-  //                           // Determine if the user selected this option.
-  //                           const isSelected =
-  //                             normalizedUserAns.includes(normalizedOption);
-
-  //                           // Debug log.
-  //                           console.log(
-  //                             "Option:",
-  //                             option,
-  //                             "isSelected:",
-  //                             isSelected,
-  //                             "isCorrect:",
-  //                             isCorrect,
-  //                             "correctAnswers:",
-  //                             correctAnswers
-  //                           );
-
-  //                           // Set label.
-  //                           let label = "";
-  //                           if (isCorrect) {
-  //                             label = isSelected
-  //                               ? " (Your correct answer)"
-  //                               : " (correct answer)";
-  //                           } else if (isSelected) {
-  //                             label = " (Your answer)";
-  //                           }
-
-  //                           // Apply logic:
-  //                           // - If the user's selection matches the correctness (i.e. either a correct option selected or an incorrect option not selected),
-  //                           //   then if it's correct, use green; otherwise, default gray.
-  //                           // - If there's a mismatch (i.e. user selected an incorrect option or missed a correct option),
-  //                           //   then force the correct answer in green and the wrong selection in red.
-  //                           const bgColor =
-  //                             isSelected === isCorrect
-  //                               ? isCorrect
-  //                                 ? "bg-green-100"
-  //                                 : "bg-gray-50"
-  //                               : isSelected
-  //                               ? "bg-red-100"
-  //                               : "bg-green-100";
-
-  //                           const textColor =
-  //                             isSelected === isCorrect
-  //                               ? isCorrect
-  //                                 ? "text-green-800"
-  //                                 : "text-gray-700"
-  //                               : isSelected
-  //                               ? "text-red-800"
-  //                               : "text-green-800";
-
-  //                           return (
-  //                             <div
-  //                               key={index}
-  //                               className={`p-2 rounded ${bgColor} ${textColor}`}
-  //                             >
-  //                               {option}
-  //                               {label}
-  //                             </div>
-  //                           );
-  //                         })}
-  //                       </div>
-  //                     </div>
-  //                   );
-  //                 })}
-  //               </div>
-  //             )}
-  //         </div>
-  //       ))}
-  //     </div>
-  //   </div>
-  // );
-  // In QuizHistory.tsx
-
   return (
     <div className="p-6">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">My Results</h2>
       <div className="grid gap-4">
-        {attempts.map((attempt) => (
-          <div key={attempt.id} className="bg-white p-4 rounded-lg shadow">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900">
-                  {attempt.quiz?.title}
-                </h3>
-                <p className="text-gray-500">
-                  Completed on{" "}
-                  {new Date(attempt.completed_at).toLocaleDateString()}
-                </p>
-                {/* Do NOT show score here by default */}
-                {selectedAttempt?.id === attempt.id && (
-                  <p className="text-gray-500">Score: {attempt.score}</p>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {attempt.quiz && attempt.quiz.answers_released && (
-                  <button
-                    onClick={() =>
-                      setSelectedAttempt(
-                        selectedAttempt?.id === attempt.id ? null : attempt
-                      )
-                    }
-                    className="mt-2 text-purple-600 hover:text-purple-800"
-                  >
-                    {selectedAttempt?.id === attempt.id
-                      ? "Hide Details"
-                      : "View Details"}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {selectedAttempt?.id === attempt.id &&
-              Object.keys(questions).length > 0 && (
-                <div className="mt-4 space-y-4">
-                  {/* Detailed view of each question, options, and answers */}
-                  {attempt.quiz.questions.map((questionId) => {
-                    const question = questions[questionId];
-                    if (!question) return null;
-
-                    let answersData = attempt.answers;
-                    if (typeof answersData === "string") {
-                      try {
-                        answersData = JSON.parse(answersData);
-                      } catch (err) {
-                        console.error("Error parsing answers:", err);
-                        answersData = {};
-                      }
-                    }
-                    const userAns = answersData[questionId] || [];
-
-                    let correctAnswerData = question.correct_answer;
-                    if (
-                      typeof correctAnswerData === "string" &&
-                      correctAnswerData.trim().startsWith("[")
-                    ) {
-                      try {
-                        correctAnswerData = JSON.parse(correctAnswerData);
-                      } catch (err) {
-                        console.error("Error parsing correct_answer:", err);
-                      }
-                    }
-                    const correctAnswers = (
-                      Array.isArray(correctAnswerData)
-                        ? correctAnswerData
-                        : [correctAnswerData]
-                    ).map(normalize);
-
-                    return (
-                      <div key={questionId} className="border rounded-lg p-4">
-                        <p className="font-medium text-gray-900">
-                          {question.question}
-                        </p>
-                        <div className="mt-2 space-y-2">
-                          {question.options.map((option, index) => {
-                            const normalizedOption = normalize(option);
-                            const normalizedUserAns = (
-                              Array.isArray(userAns) ? userAns : [userAns]
-                            ).map(normalize);
-
-                            const isCorrect =
-                              correctAnswers.includes(normalizedOption);
-                            const isSelected =
-                              normalizedUserAns.includes(normalizedOption);
-
-                            let label = "";
-                            if (isCorrect) {
-                              label = isSelected
-                                ? " (Your correct answer)"
-                                : " (correct answer)";
-                            } else if (isSelected) {
-                              label = " (Your answer)";
-                            }
-
-                            const bgColor =
-                              isSelected === isCorrect
-                                ? isCorrect
-                                  ? "bg-green-100"
-                                  : "bg-gray-50"
-                                : isSelected
-                                ? "bg-red-100"
-                                : "bg-green-100";
-
-                            const textColor =
-                              isSelected === isCorrect
-                                ? isCorrect
-                                  ? "text-green-800"
-                                  : "text-gray-700"
-                                : isSelected
-                                ? "text-red-800"
-                                : "text-green-800";
-
-                            return (
-                              <div
-                                key={index}
-                                className={`p-2 rounded ${bgColor} ${textColor}`}
-                              >
-                                {option}
-                                {label}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
+        {attempts.map((attempt) => {
+          // Compute total marks for this quiz attempt (from loaded question details)
+          const totalMarks =
+            attempt.quiz?.questions?.reduce((sum, qid) => {
+              const q = questions[qid];
+              return sum + (q ? Number(q.marks) : 0);
+            }, 0) || 0;
+          return (
+            <div key={attempt.id} className="bg-white p-4 rounded-lg shadow">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">
+                    {attempt.quiz?.title}
+                  </h3>
+                  <p className="text-gray-500">
+                    Completed on{" "}
+                    {new Date(attempt.completed_at).toLocaleDateString()}
+                  </p>
+                  {/* Display the current score and total marks when details are shown */}
+                  {selectedAttempt?.id === attempt.id && (
+                    <p className="text-gray-500">
+                      Score: {attempt.score} / {totalMarks}
+                    </p>
+                  )}
                 </div>
-              )}
-          </div>
-        ))}
+                <div className="flex items-center gap-2">
+                  {attempt.quiz && attempt.quiz.answers_released && (
+                    <button
+                      onClick={() =>
+                        setSelectedAttempt(
+                          selectedAttempt?.id === attempt.id ? null : attempt
+                        )
+                      }
+                      className="mt-2 text-purple-600 hover:text-purple-800"
+                    >
+                      {selectedAttempt?.id === attempt.id
+                        ? "Hide Details"
+                        : "View Details"}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {selectedAttempt?.id === attempt.id &&
+                Object.keys(questions).length > 0 && (
+                  <div className="mt-4 space-y-4">
+                    {attempt.quiz.questions.map((questionId) => {
+                      const question = questions[questionId];
+                      if (!question) return null;
+
+                      let answersData = attempt.answers;
+                      if (typeof answersData === "string") {
+                        try {
+                          answersData = JSON.parse(answersData);
+                        } catch (err) {
+                          console.error("Error parsing answers:", err);
+                          answersData = {};
+                        }
+                      }
+                      const userAns = answersData[questionId] || [];
+
+                      let correctAnswerData = question.correct_answer;
+                      if (
+                        typeof correctAnswerData === "string" &&
+                        correctAnswerData.trim().startsWith("[")
+                      ) {
+                        try {
+                          correctAnswerData = JSON.parse(correctAnswerData);
+                        } catch (err) {
+                          console.error("Error parsing correct_answer:", err);
+                        }
+                      }
+                      const correctAnswers = (
+                        Array.isArray(correctAnswerData)
+                          ? correctAnswerData
+                          : [correctAnswerData]
+                      ).map(normalize);
+
+                      return (
+                        <div key={questionId} className="border rounded-lg p-4">
+                          <p className="font-medium text-gray-900">
+                            {question.question}
+                          </p>
+                          <div className="mt-2 space-y-2">
+                            {question.options.map((option, index) => {
+                              const normalizedOption = normalize(option);
+                              const normalizedUserAns = (
+                                Array.isArray(userAns) ? userAns : [userAns]
+                              ).map(normalize);
+
+                              const isCorrect =
+                                correctAnswers.includes(normalizedOption);
+                              const isSelected =
+                                normalizedUserAns.includes(normalizedOption);
+
+                              let label = "";
+                              if (isCorrect) {
+                                label = isSelected
+                                  ? " (Your correct answer)"
+                                  : " (correct answer)";
+                              } else if (isSelected) {
+                                label = " (Your answer)";
+                              }
+
+                              const bgColor =
+                                isSelected === isCorrect
+                                  ? isCorrect
+                                    ? "bg-green-100"
+                                    : "bg-gray-50"
+                                  : isSelected
+                                  ? "bg-red-100"
+                                  : "bg-green-100";
+
+                              const textColor =
+                                isSelected === isCorrect
+                                  ? isCorrect
+                                    ? "text-green-800"
+                                    : "text-gray-700"
+                                  : isSelected
+                                  ? "text-red-800"
+                                  : "text-green-800";
+
+                              return (
+                                <div
+                                  key={index}
+                                  className={`p-2 rounded ${bgColor} ${textColor}`}
+                                >
+                                  {option}
+                                  {label}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
-
 
 function JoinClass() {
   const [joinCode, setJoinCode] = useState("");
