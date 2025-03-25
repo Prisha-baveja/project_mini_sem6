@@ -238,8 +238,768 @@ function ClassDetails() {
   );
 }
 
+// function TakeQuiz() {
+//   const { quizId } = useParams<{ quizId: string }>();
+//   const [quiz, setQuiz] = useState<Quiz | null>(null);
+//   const [questions, setQuestions] = useState<Question[]>([]);
+//   const [currentQuestion, setCurrentQuestion] = useState(0);
+//   // Store answers as an object mapping question IDs to an array of selected options.
+//   const [answers, setAnswers] = useState<Record<string, string[]>>({});
+//   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+//   const [hasAttempted, setHasAttempted] = useState(false);
+//   const navigate = useNavigate();
+//   const user = useAuthStore((state) => state.user);
+
+//   useEffect(() => {
+//     if (quizId && user) {
+//       checkPreviousAttempt();
+//       loadQuiz();
+//     }
+//   }, [quizId, user]);
+
+//   const checkPreviousAttempt = async () => {
+//     if (!user || !quizId) return;
+//     try {
+//       // Using maybeSingle() so that if no attempt exists, it returns null without error.
+//       const { data, error } = await supabase
+//         .from("quiz_attempts")
+//         .select("id")
+//         .eq("quiz_id", quizId)
+//         .eq("user_id", user.id)
+//         .maybeSingle();
+//       if (data) {
+//         setHasAttempted(true);
+//       }
+//       if (error && error.code !== "PGRST116") {
+//         console.error("Error checking quiz attempt:", error);
+//       }
+//     } catch (err) {
+//       console.error("Error in checkPreviousAttempt:", err);
+//     }
+//   };
+
+//   const loadQuiz = async () => {
+//     try {
+//       const { data: quizData, error } = await supabase
+//         .from("quizzes")
+//         .select("*")
+//         .eq("id", quizId)
+//         .maybeSingle();
+
+//       if (error) throw error;
+
+//       if (quizData) {
+//         // Check if the quiz is released.
+//         if (!quizData.release_quiz) {
+//           alert("This quiz is not released yet.");
+//           navigate("/student");
+//           return;
+//         }
+//         setQuiz(quizData);
+//         // Set initial timer value in seconds.
+//         setTimeLeft(quizData.time_limit * 60);
+
+//         // Load questions using the array of question IDs stored in quizData.questions.
+//         const { data: questionData, error: questionError } = await supabase
+//           .from("questions")
+//           .select("id, question, options, correct_answer, questionType, marks")
+//           .in("id", quizData.questions);
+
+//         if (questionError) throw questionError;
+
+//         if (questionData) {
+//           const formattedQuestions = questionData.map((q) => ({
+//             ...q,
+//             options:
+//               typeof q.options === "string" ? JSON.parse(q.options) : q.options,
+//             correct_answer:
+//               typeof q.correct_answer === "string"
+//                 ? JSON.parse(q.correct_answer)
+//                 : q.correct_answer,
+//           }));
+//           setQuestions(formattedQuestions);
+//         }
+//       }
+//     } catch (err) {
+//       console.error("Error loading quiz:", err);
+//     }
+//   };
+
+//   // Timer effect: decrement the timer every second and auto-submit when time runs out.
+//   useEffect(() => {
+//     if (quiz && timeLeft !== null) {
+//       const interval = setInterval(() => {
+//         setTimeLeft((prevTime) => {
+//           if (prevTime !== null) {
+//             if (prevTime <= 1) {
+//               clearInterval(interval);
+//               handleSubmit();
+//               return 0;
+//             }
+//             return prevTime - 1;
+//           }
+//           return null;
+//         });
+//       }, 1000);
+//       return () => clearInterval(interval);
+//     }
+//   }, [quiz, timeLeft]);
+
+//   const handleAnswer = (option: string) => {
+//     const question = questions[currentQuestion];
+//     const qid = question.id;
+//     const currentAns = answers[qid] || [];
+
+//     if (question.questionType === "multiple") {
+//       // Toggle the option for multiple-correct questions.
+//       if (currentAns.includes(option)) {
+//         setAnswers({
+//           ...answers,
+//           [qid]: currentAns.filter((ans) => ans !== option),
+//         });
+//       } else {
+//         setAnswers({
+//           ...answers,
+//           [qid]: [...currentAns, option],
+//         });
+//       }
+//     } else {
+//       // For single correct questions, replace any previous answer.
+//       setAnswers({
+//         ...answers,
+//         [qid]: [option],
+//       });
+//     }
+//   };
+
+//   // Helper function to normalize answers
+//   const normalizeAnswer = (answer: string) => answer.trim().toLowerCase();
+
+//   const handleSubmit = async () => {
+//     if (hasAttempted) {
+//       alert("You have already attempted this quiz.");
+//       return;
+//     }
+//     if (!quiz || !user) return;
+
+//     let score = 0;
+//     let totalMarks = 0;
+
+//     questions.forEach((question) => {
+//       const questionMarks = Number(question.marks) || 0;
+//       totalMarks += questionMarks;
+//       const given = answers[question.id] || [];
+
+//       if (question.questionType === "multiple") {
+//         let correct = question.correct_answer;
+//         if (typeof correct === "string" && correct.trim().startsWith("[")) {
+//           try {
+//             correct = JSON.parse(correct);
+//           } catch (error) {
+//             console.error("Error parsing correct_answer:", error);
+//           }
+//         }
+//         if (Array.isArray(correct)) {
+//           const normalizedCorrect = correct
+//             .map((a: string) => a.trim().toLowerCase())
+//             .sort();
+//           const normalizedGiven = given
+//             .map((a: string) => a.trim().toLowerCase())
+//             .sort();
+//           if (
+//             normalizedGiven.length === normalizedCorrect.length &&
+//             normalizedGiven.every(
+//               (ans, index) => ans === normalizedCorrect[index]
+//             )
+//           ) {
+//             score += questionMarks;
+//           }
+//         }
+//       } else {
+//         let correct = question.correct_answer;
+//         if (typeof correct === "string" && correct.trim().startsWith("[")) {
+//           try {
+//             correct = JSON.parse(correct);
+//           } catch (error) {
+//             console.error(
+//               "Error parsing correct_answer for single correct question:",
+//               error
+//             );
+//           }
+//         }
+//         if (Array.isArray(correct)) {
+//           correct = correct[0];
+//         }
+//         if (
+//           given[0] &&
+//           given[0].trim().toLowerCase() === String(correct).trim().toLowerCase()
+//         ) {
+//           score += questionMarks;
+//         }
+//       }
+//     });
+
+//     console.log("Calculated Score:", score, "Total Marks:", totalMarks);
+
+//     try {
+//       const { data, error } = await supabase
+//         .from("quiz_attempts")
+//         .insert([
+//           {
+//             quiz_id: quiz.id,
+//             user_id: user.id,
+//             score: Number(score),
+//             answers,
+//             completed_at: new Date(),
+//           },
+//         ])
+//         .select(); // returning the inserted row for debugging
+
+//       if (error) {
+//         console.error("Insert error:", error);
+//         throw error;
+//       }
+
+//       console.log("Inserted attempt data:", data);
+//       navigate("/student/history");
+//     } catch (error) {
+//       console.error("Error submitting quiz:", error);
+//       alert("Failed to submit quiz. Please try again.");
+//     }
+//   };
+
+//   if (hasAttempted) {
+//     return (
+//       <div className="p-6 max-w-3xl mx-auto">
+//         <div className="bg-red-100 border border-red-300 text-red-800 p-6 rounded-lg text-center">
+//           <p className="text-xl font-bold mb-4">
+//             You have already attempted this quiz.
+//           </p>
+//           <p className="mb-6">You cannot attempt it again.</p>
+//           <button
+//             onClick={() => navigate("/student/history")}
+//             className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700"
+//           >
+//             View Quiz History
+//           </button>
+//         </div>
+//       </div>
+//     );
+//   }
+
+//   if (!quiz || questions.length === 0) return null;
+
+//   const question = questions[currentQuestion];
+//   const minutes = Math.floor((timeLeft || 0) / 60);
+//   const seconds = (timeLeft || 0) % 60;
+
+//   return (
+//     <div className="p-6 max-w-3xl mx-auto">
+//       <div className="bg-white rounded-lg shadow-lg p-6">
+//         <div className="flex justify-between items-center mb-6">
+//           <h2 className="text-2xl font-bold text-gray-900">{quiz.title}</h2>
+//           <div className="flex items-center gap-2 text-purple-600">
+//             <Clock className="w-5 h-5" />
+//             {minutes}:{seconds.toString().padStart(2, "0")}
+//           </div>
+//         </div>
+
+//         <div className="mb-6">
+//           <div className="text-sm text-gray-500 mb-2">
+//             Question {currentQuestion + 1} of {questions.length}
+//           </div>
+//           <div className="w-full bg-gray-200 rounded-full h-2">
+//             <div
+//               className="bg-purple-600 rounded-full h-2"
+//               style={{
+//                 width: `${((currentQuestion + 1) / questions.length) * 100}%`,
+//               }}
+//             />
+//           </div>
+//         </div>
+
+//         <div className="mb-4">
+//           <h3 className="text-lg font-medium text-gray-900">
+//             {question.question}
+//           </h3>
+//           <p className="text-sm text-gray-500">Marks: {question.marks}</p>
+//           <p className="text-sm text-gray-500">Type: {question.questionType}</p>
+//         </div>
+
+//         <div className="space-y-3">
+//           {question.options.map((option, index) => {
+//             const selected = answers[question.id]?.includes(option);
+//             return (
+//               <button
+//                 key={index}
+//                 onClick={() => handleAnswer(option)}
+//                 className={`w-full p-3 text-left rounded-lg border ${
+//                   selected
+//                     ? "border-purple-600 bg-purple-50"
+//                     : "border-gray-300 hover:border-purple-600"
+//                 }`}
+//               >
+//                 {option}
+//               </button>
+//             );
+//           })}
+//         </div>
+
+//         <div className="mt-6 flex justify-between">
+//           <button
+//             onClick={() => setCurrentQuestion(currentQuestion - 1)}
+//             disabled={currentQuestion === 0}
+//             className="px-4 py-2 text-purple-600 disabled:text-gray-400"
+//           >
+//             Previous
+//           </button>
+//           {currentQuestion === questions.length - 1 ? (
+//             <button
+//               onClick={handleSubmit}
+//               className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700"
+//             >
+//               Submit
+//             </button>
+//           ) : (
+//             <button
+//               onClick={() => setCurrentQuestion(currentQuestion + 1)}
+//               disabled={
+//                 !answers[question.id] || answers[question.id].length === 0
+//               }
+//               className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400"
+//             >
+//               Next
+//             </button>
+//           )}
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+
+// function TakeQuiz() {
+//   const { quizId } = useParams<{ quizId: string }>();
+//   const navigate = useNavigate();
+//   const user = useAuthStore((state) => state.user);
+//   const [quiz, setQuiz] = useState<Quiz | null>(null);
+//   const [questions, setQuestions] = useState<Question[]>([]);
+//   const [currentQuestion, setCurrentQuestion] = useState(0);
+//   // Store answers as an object mapping question IDs to an array of selected options.
+//   const [answers, setAnswers] = useState<Record<string, string[]>>({});
+//   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+//   const [hasAttempted, setHasAttempted] = useState(false);
+//   // State to track tab switches.
+//   const [tabSwitchCount, setTabSwitchCount] = useState(0);
+//   // New state to track desktop changes (approximated via window blur events)
+//   const [desktopChangeCount, setDesktopChangeCount] = useState(0);
+
+//   useEffect(() => {
+//     if (quizId && user) {
+//       checkPreviousAttempt();
+//       loadQuiz();
+//     }
+//   }, [quizId, user]);
+
+//   // Listen for tab switches or when the browser is minimized.
+//   useEffect(() => {
+//     const handleVisibilityChange = () => {
+//       if (document.hidden) {
+//         console.log("User switched tab or minimized the browser.");
+//         setTabSwitchCount((prev) => prev + 1);
+//       }
+//     };
+//     document.addEventListener("visibilitychange", handleVisibilityChange);
+//     return () =>
+//       document.removeEventListener("visibilitychange", handleVisibilityChange);
+//   }, []);
+
+//   // Listen for window blur events as an approximation for desktop changes.
+//   useEffect(() => {
+//     const handleWindowBlur = () => {
+//       console.log("Window lost focus - possible desktop change.");
+//       setDesktopChangeCount((prev) => prev + 1);
+//     };
+//     window.addEventListener("blur", handleWindowBlur);
+//     return () => window.removeEventListener("blur", handleWindowBlur);
+//   }, []);
+
+//   const checkPreviousAttempt = async () => {
+//     if (!user || !quizId) return;
+//     try {
+//       const { data, error } = await supabase
+//         .from("quiz_attempts")
+//         .select("id")
+//         .eq("quiz_id", quizId)
+//         .eq("user_id", user.id)
+//         .maybeSingle();
+//       if (data) {
+//         setHasAttempted(true);
+//       }
+//       if (error && error.code !== "PGRST116") {
+//         console.error("Error checking quiz attempt:", error);
+//       }
+//     } catch (err) {
+//       console.error("Error in checkPreviousAttempt:", err);
+//     }
+//   };
+
+//   const loadQuiz = async () => {
+//     try {
+//       const { data: quizData, error } = await supabase
+//         .from("quizzes")
+//         .select("*")
+//         .eq("id", quizId)
+//         .maybeSingle();
+
+//       if (error) throw error;
+
+//       if (quizData) {
+//         if (!quizData.release_quiz) {
+//           alert("This quiz is not released yet.");
+//           navigate("/student");
+//           return;
+//         }
+//         setQuiz(quizData);
+//         setTimeLeft(quizData.time_limit * 60);
+
+//         const { data: questionData, error: questionError } = await supabase
+//           .from("questions")
+//           .select("id, question, options, correct_answer, questionType, marks")
+//           .in("id", quizData.questions);
+
+//         if (questionError) throw questionError;
+
+//         if (questionData) {
+//           const formattedQuestions = questionData.map((q) => ({
+//             ...q,
+//             options:
+//               typeof q.options === "string" ? JSON.parse(q.options) : q.options,
+//             correct_answer:
+//               typeof q.correct_answer === "string"
+//                 ? JSON.parse(q.correct_answer)
+//                 : q.correct_answer,
+//           }));
+//           setQuestions(formattedQuestions);
+//         }
+//       }
+//     } catch (err) {
+//       console.error("Error loading quiz:", err);
+//     }
+//   };
+
+//   // Timer effect: decrement timer every second and auto-submit when time runs out.
+//   useEffect(() => {
+//     if (quiz && timeLeft !== null) {
+//       const interval = setInterval(() => {
+//         setTimeLeft((prevTime) => {
+//           if (prevTime !== null) {
+//             if (prevTime <= 1) {
+//               clearInterval(interval);
+//               handleSubmit();
+//               return 0;
+//             }
+//             return prevTime - 1;
+//           }
+//           return null;
+//         });
+//       }, 1000);
+//       return () => clearInterval(interval);
+//     }
+//   }, [quiz, timeLeft]);
+
+//   const handleAnswer = (option: string) => {
+//     const question = questions[currentQuestion];
+//     const qid = question.id;
+//     const currentAns = answers[qid] || [];
+
+//     if (question.questionType === "multiple") {
+//       if (currentAns.includes(option)) {
+//         setAnswers({
+//           ...answers,
+//           [qid]: currentAns.filter((ans) => ans !== option),
+//         });
+//       } else {
+//         setAnswers({
+//           ...answers,
+//           [qid]: [...currentAns, option],
+//         });
+//       }
+//     } else {
+//       setAnswers({
+//         ...answers,
+//         [qid]: [option],
+//       });
+//     }
+//   };
+
+//   const normalizeAnswer = (answer: string) => answer.trim().toLowerCase();
+
+//   // const handleSubmit = async () => {
+//   //   if (hasAttempted) {
+//   //     alert("You have already attempted this quiz.");
+//   //     return;
+//   //   }
+//   //   if (!quiz || !user) return;
+
+//   //   let score = 0;
+//   //   let totalMarks = 0;
+
+//   //   questions.forEach((question) => {
+//   //     const questionMarks = Number(question.marks) || 0;
+//   //     totalMarks += questionMarks;
+//   //     const given = answers[question.id] || [];
+
+//   //     if (question.questionType === "multiple") {
+//   //       let correct = question.correct_answer;
+//   //       if (typeof correct === "string" && correct.trim().startsWith("[")) {
+//   //         try {
+//   //           correct = JSON.parse(correct);
+//   //         } catch (error) {
+//   //           console.error("Error parsing correct_answer:", error);
+//   //         }
+//   //       }
+//   //       if (Array.isArray(correct)) {
+//   //         const normalizedCorrect = correct
+//   //           .map((a: string) => a.trim().toLowerCase())
+//   //           .sort();
+//   //         const normalizedGiven = given
+//   //           .map((a: string) => a.trim().toLowerCase())
+//   //           .sort();
+//   //         if (
+//   //           normalizedGiven.length === normalizedCorrect.length &&
+//   //           normalizedGiven.every(
+//   //             (ans, index) => ans === normalizedCorrect[index]
+//   //           )
+//   //         ) {
+//   //           score += questionMarks;
+//   //         }
+//   //       }
+//   //     } else {
+//   //       let correct = question.correct_answer;
+//   //       if (typeof correct === "string" && correct.trim().startsWith("[")) {
+//   //         try {
+//   //           correct = JSON.parse(correct);
+//   //         } catch (error) {
+//   //           console.error(
+//   //             "Error parsing correct_answer for single correct question:",
+//   //             error
+//   //           );
+//   //         }
+//   //       }
+//   //       if (Array.isArray(correct)) {
+//   //         correct = correct[0];
+//   //       }
+//   //       if (
+//   //         given[0] &&
+//   //         given[0].trim().toLowerCase() === String(correct).trim().toLowerCase()
+//   //       ) {
+//   //         score += questionMarks;
+//   //       }
+//   //     }
+//   //   });
+
+//   //   console.log("Calculated Score:", score, "Total Marks:", totalMarks);
+
+//   //   try {
+//   //     const { data, error } = await supabase
+//   //       .from("quiz_attempts")
+//   //       .insert([
+//   //         {
+//   //           quiz_id: quiz.id,
+//   //           user_id: user.id,
+//   //           score: Number(score),
+//   //           answers,
+//   //           completed_at: new Date(),
+//   //         },
+//   //       ])
+//   //       .select();
+
+//   //     if (error) {
+//   //       console.error("Insert error:", error);
+//   //       throw error;
+//   //     }
+
+//   //     console.log("Inserted attempt data:", data);
+//   //     navigate("/student/history");
+//   //   } catch (error) {
+//   //     console.error("Error submitting quiz:", error);
+//   //     alert("Failed to submit quiz. Please try again.");
+//   //   }
+//   // };
+
+//     const handleSubmit = async () => {
+//       if (hasAttempted) {
+//         alert("You have already attempted this quiz.");
+//         return;
+//       }
+//       if (!quiz || !user) return;
+
+//       let score = 0;
+//       let totalMarks = 0;
+
+//       questions.forEach((question) => {
+//         const questionMarks = Number(question.marks) || 0;
+//         totalMarks += questionMarks;
+//         const given = answers[question.id] || [];
+//         // For testing: if any answer is provided, award full marks
+//         if (given.length > 0) {
+//           score += questionMarks;
+//         }
+//       });
+
+//       console.log("Calculated Score:", score, "Total Marks:", totalMarks);
+
+//       try {
+//         // If your 'answers' column is of type JSON, pass the answers object directly.
+//         const result = await supabase
+//           .from("quiz_attempts")
+//           .insert([
+//             {
+//               quiz_id: quiz.id,
+//               user_id: user.id,
+//               score: score,
+//               answers: answers, // Pass directly if the column is JSON.
+//               tab_switch_count: tabSwitchCount,
+//               desktop_change_count: desktopChangeCount,
+//               completed_at: new Date(),
+//             },
+//           ])
+//           .select();
+
+//         if (result.error) {
+//           console.error("Insert error:", JSON.stringify(result.error, null, 2));
+//           throw result.error;
+//         }
+
+//         console.log("Inserted attempt data:", result.data);
+//         navigate("/student/history");
+//       } catch (err) {
+//         console.error("Error submitting quiz:", err);
+//         alert("Failed to submit quiz. Please try again.");
+//       }
+//     };
+
+//   if (hasAttempted) {
+//     return (
+//       <div className="p-6 max-w-3xl mx-auto">
+//         <div className="bg-red-100 border border-red-300 text-red-800 p-6 rounded-lg text-center">
+//           <p className="text-xl font-bold mb-4">
+//             You have already attempted this quiz.
+//           </p>
+//           <p className="mb-6">You cannot attempt it again.</p>
+//           <button
+//             onClick={() => navigate("/student/history")}
+//             className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700"
+//           >
+//             View Quiz History
+//           </button>
+//         </div>
+//       </div>
+//     );
+//   }
+
+//   if (!quiz || questions.length === 0) return null;
+
+//   const question = questions[currentQuestion];
+//   const minutes = Math.floor((timeLeft || 0) / 60);
+//   const seconds = (timeLeft || 0) % 60;
+
+//   return (
+//     <div className="p-6 max-w-3xl mx-auto">
+//       <div className="bg-white rounded-lg shadow-lg p-6">
+//         <div className="flex justify-between items-center mb-6">
+//           <h2 className="text-2xl font-bold text-gray-900">{quiz.title}</h2>
+//           <div className="flex flex-col items-end">
+//             <div className="text-sm text-red-600">
+//               Tab switches: {tabSwitchCount}
+//             </div>
+//             <div className="text-sm text-blue-600">
+//               Desktop changes: {desktopChangeCount}
+//             </div>
+//             <div className="flex items-center gap-2 text-purple-600">
+//               <Clock className="w-5 h-5" />
+//               {minutes}:{seconds.toString().padStart(2, "0")}
+//             </div>
+//           </div>
+//         </div>
+
+//         <div className="mb-6">
+//           <div className="text-sm text-gray-500 mb-2">
+//             Question {currentQuestion + 1} of {questions.length}
+//           </div>
+//           <div className="w-full bg-gray-200 rounded-full h-2">
+//             <div
+//               className="bg-purple-600 rounded-full h-2"
+//               style={{
+//                 width: `${((currentQuestion + 1) / questions.length) * 100}%`,
+//               }}
+//             />
+//           </div>
+//         </div>
+
+//         <div className="mb-4">
+//           <h3 className="text-lg font-medium text-gray-900">
+//             {question.question}
+//           </h3>
+//           <p className="text-sm text-gray-500">Marks: {question.marks}</p>
+//           <p className="text-sm text-gray-500">Type: {question.questionType}</p>
+//         </div>
+
+//         <div className="space-y-3">
+//           {question.options.map((option, index) => {
+//             const selected = answers[question.id]?.includes(option);
+//             return (
+//               <button
+//                 key={index}
+//                 onClick={() => handleAnswer(option)}
+//                 className={`w-full p-3 text-left rounded-lg border ${
+//                   selected
+//                     ? "border-purple-600 bg-purple-50"
+//                     : "border-gray-300 hover:border-purple-600"
+//                 }`}
+//               >
+//                 {option}
+//               </button>
+//             );
+//           })}
+//         </div>
+
+//         <div className="mt-6 flex justify-between">
+//           <button
+//             onClick={() => setCurrentQuestion(currentQuestion - 1)}
+//             disabled={currentQuestion === 0}
+//             className="px-4 py-2 text-purple-600 disabled:text-gray-400"
+//           >
+//             Previous
+//           </button>
+//           {currentQuestion === questions.length - 1 ? (
+//             <button
+//               onClick={handleSubmit}
+//               className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700"
+//             >
+//               Submit
+//             </button>
+//           ) : (
+//             <button
+//               onClick={() => setCurrentQuestion(currentQuestion + 1)}
+//               disabled={
+//                 !answers[question.id] || answers[question.id].length === 0
+//               }
+//               className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400"
+//             >
+//               Next
+//             </button>
+//           )}
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+
 function TakeQuiz() {
   const { quizId } = useParams<{ quizId: string }>();
+  const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -247,8 +1007,10 @@ function TakeQuiz() {
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [hasAttempted, setHasAttempted] = useState(false);
-  const navigate = useNavigate();
-  const user = useAuthStore((state) => state.user);
+  // State to track tab switches.
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  // State to track desktop changes (approximated via window blur events)
+  const [desktopChangeCount, setDesktopChangeCount] = useState(0);
 
   useEffect(() => {
     if (quizId && user) {
@@ -257,10 +1019,32 @@ function TakeQuiz() {
     }
   }, [quizId, user]);
 
+  // Listen for tab switches or when the browser is minimized.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log("User switched tab or minimized the browser.");
+        setTabSwitchCount((prev) => prev + 1);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
+  // Listen for window blur events as an approximation for desktop changes.
+  useEffect(() => {
+    const handleWindowBlur = () => {
+      console.log("Window lost focus - possible desktop change.");
+      setDesktopChangeCount((prev) => prev + 1);
+    };
+    window.addEventListener("blur", handleWindowBlur);
+    return () => window.removeEventListener("blur", handleWindowBlur);
+  }, []);
+
   const checkPreviousAttempt = async () => {
     if (!user || !quizId) return;
     try {
-      // Using maybeSingle() so that if no attempt exists, it returns null without error.
       const { data, error } = await supabase
         .from("quiz_attempts")
         .select("id")
@@ -289,17 +1073,14 @@ function TakeQuiz() {
       if (error) throw error;
 
       if (quizData) {
-        // Check if the quiz is released.
         if (!quizData.release_quiz) {
           alert("This quiz is not released yet.");
           navigate("/student");
           return;
         }
         setQuiz(quizData);
-        // Set initial timer value in seconds.
         setTimeLeft(quizData.time_limit * 60);
 
-        // Load questions using the array of question IDs stored in quizData.questions.
         const { data: questionData, error: questionError } = await supabase
           .from("questions")
           .select("id, question, options, correct_answer, questionType, marks")
@@ -325,7 +1106,7 @@ function TakeQuiz() {
     }
   };
 
-  // Timer effect: decrement the timer every second and auto-submit when time runs out.
+  // Timer effect: decrement timer every second and auto-submit when time runs out.
   useEffect(() => {
     if (quiz && timeLeft !== null) {
       const interval = setInterval(() => {
@@ -345,13 +1126,12 @@ function TakeQuiz() {
     }
   }, [quiz, timeLeft]);
 
+  // For multiple-choice questions.
   const handleAnswer = (option: string) => {
     const question = questions[currentQuestion];
     const qid = question.id;
     const currentAns = answers[qid] || [];
-
     if (question.questionType === "multiple") {
-      // Toggle the option for multiple-correct questions.
       if (currentAns.includes(option)) {
         setAnswers({
           ...answers,
@@ -364,7 +1144,6 @@ function TakeQuiz() {
         });
       }
     } else {
-      // For single correct questions, replace any previous answer.
       setAnswers({
         ...answers,
         [qid]: [option],
@@ -372,8 +1151,15 @@ function TakeQuiz() {
     }
   };
 
-  // Helper function to normalize answers
-  const normalizeAnswer = (answer: string) => answer.trim().toLowerCase();
+  // For fill/numerical type questions.
+  const handleInputAnswer = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Store answer in lowercase for case-insensitive evaluation.
+    setAnswers({
+      ...answers,
+      [questions[currentQuestion].id]: [value.toLowerCase()],
+    });
+  };
 
   const handleSubmit = async () => {
     if (hasAttempted) {
@@ -384,86 +1170,40 @@ function TakeQuiz() {
 
     let score = 0;
     let totalMarks = 0;
-
     questions.forEach((question) => {
       const questionMarks = Number(question.marks) || 0;
       totalMarks += questionMarks;
       const given = answers[question.id] || [];
-
-      if (question.questionType === "multiple") {
-        let correct = question.correct_answer;
-        if (typeof correct === "string" && correct.trim().startsWith("[")) {
-          try {
-            correct = JSON.parse(correct);
-          } catch (error) {
-            console.error("Error parsing correct_answer:", error);
-          }
-        }
-        if (Array.isArray(correct)) {
-          const normalizedCorrect = correct
-            .map((a: string) => a.trim().toLowerCase())
-            .sort();
-          const normalizedGiven = given
-            .map((a: string) => a.trim().toLowerCase())
-            .sort();
-          if (
-            normalizedGiven.length === normalizedCorrect.length &&
-            normalizedGiven.every(
-              (ans, index) => ans === normalizedCorrect[index]
-            )
-          ) {
-            score += questionMarks;
-          }
-        }
-      } else {
-        let correct = question.correct_answer;
-        if (typeof correct === "string" && correct.trim().startsWith("[")) {
-          try {
-            correct = JSON.parse(correct);
-          } catch (error) {
-            console.error(
-              "Error parsing correct_answer for single correct question:",
-              error
-            );
-          }
-        }
-        if (Array.isArray(correct)) {
-          correct = correct[0];
-        }
-        if (
-          given[0] &&
-          given[0].trim().toLowerCase() === String(correct).trim().toLowerCase()
-        ) {
-          score += questionMarks;
-        }
+      // For testing: if any answer is provided, award full marks.
+      if (given.length > 0) {
+        score += questionMarks;
       }
     });
-
     console.log("Calculated Score:", score, "Total Marks:", totalMarks);
 
     try {
-      const { data, error } = await supabase
+      const result = await supabase
         .from("quiz_attempts")
         .insert([
           {
             quiz_id: quiz.id,
             user_id: user.id,
-            score: Number(score),
-            answers,
+            score: score,
+            answers: JSON.stringify(answers),
+            tab_switch_count: tabSwitchCount,
+            desktop_change_count: desktopChangeCount,
             completed_at: new Date(),
           },
         ])
-        .select(); // returning the inserted row for debugging
-
-      if (error) {
-        console.error("Insert error:", error);
-        throw error;
+        .select();
+      if (result.error) {
+        console.error("Insert error:", JSON.stringify(result.error, null, 2));
+        throw result.error;
       }
-
-      console.log("Inserted attempt data:", data);
+      console.log("Inserted attempt data:", result.data);
       navigate("/student/history");
-    } catch (error) {
-      console.error("Error submitting quiz:", error);
+    } catch (err) {
+      console.error("Error submitting quiz:", err);
       alert("Failed to submit quiz. Please try again.");
     }
   };
@@ -498,9 +1238,11 @@ function TakeQuiz() {
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-900">{quiz.title}</h2>
-          <div className="flex items-center gap-2 text-purple-600">
-            <Clock className="w-5 h-5" />
-            {minutes}:{seconds.toString().padStart(2, "0")}
+          <div className="flex flex-col items-end">
+            <div className="flex items-center gap-2 text-purple-600">
+              <Clock className="w-5 h-5" />
+              {minutes}:{seconds.toString().padStart(2, "0")}
+            </div>
           </div>
         </div>
 
@@ -527,22 +1269,33 @@ function TakeQuiz() {
         </div>
 
         <div className="space-y-3">
-          {question.options.map((option, index) => {
-            const selected = answers[question.id]?.includes(option);
-            return (
-              <button
-                key={index}
-                onClick={() => handleAnswer(option)}
-                className={`w-full p-3 text-left rounded-lg border ${
-                  selected
-                    ? "border-purple-600 bg-purple-50"
-                    : "border-gray-300 hover:border-purple-600"
-                }`}
-              >
-                {option}
-              </button>
-            );
-          })}
+          {question.questionType === "fill" ||
+          question.questionType === "numerical" ? (
+            <input
+              type="text"
+              placeholder="Type your answer here..."
+              value={answers[question.id]?.[0] || ""}
+              onChange={handleInputAnswer}
+              className="w-full p-3 border rounded-md focus:border-purple-600 focus:ring-purple-500"
+            />
+          ) : (
+            question.options.map((option, index) => {
+              const selected = answers[question.id]?.includes(option);
+              return (
+                <button
+                  key={index}
+                  onClick={() => handleAnswer(option)}
+                  className={`w-full p-3 text-left rounded-lg border ${
+                    selected
+                      ? "border-purple-600 bg-purple-50"
+                      : "border-gray-300 hover:border-purple-600"
+                  }`}
+                >
+                  {option}
+                </button>
+              );
+            })
+          )}
         </div>
 
         <div className="mt-6 flex justify-between">
@@ -767,63 +1520,96 @@ function QuizHistory() {
                           : [correctAnswerData]
                       ).map(normalize);
 
-                      return (
-                        <div key={questionId} className="border rounded-lg p-4">
-                          <p className="font-medium text-gray-900">
-                            {question.question}
-                          </p>
-                          <div className="mt-2 space-y-2">
-                            {question.options.map((option, index) => {
-                              const normalizedOption = normalize(option);
-                              const normalizedUserAns = (
-                                Array.isArray(userAns) ? userAns : [userAns]
-                              ).map(normalize);
-
-                              const isCorrect =
-                                correctAnswers.includes(normalizedOption);
-                              const isSelected =
-                                normalizedUserAns.includes(normalizedOption);
-
-                              let label = "";
-                              if (isCorrect) {
-                                label = isSelected
-                                  ? " (Your correct answer)"
-                                  : " (correct answer)";
-                              } else if (isSelected) {
-                                label = " (Your answer)";
-                              }
-
-                              const bgColor =
-                                isSelected === isCorrect
-                                  ? isCorrect
-                                    ? "bg-green-100"
-                                    : "bg-gray-50"
-                                  : isSelected
-                                  ? "bg-red-100"
-                                  : "bg-green-100";
-
-                              const textColor =
-                                isSelected === isCorrect
-                                  ? isCorrect
-                                    ? "text-green-800"
-                                    : "text-gray-700"
-                                  : isSelected
-                                  ? "text-red-800"
-                                  : "text-green-800";
-
-                              return (
-                                <div
-                                  key={index}
-                                  className={`p-2 rounded ${bgColor} ${textColor}`}
-                                >
-                                  {option}
-                                  {label}
-                                </div>
-                              );
-                            })}
+                      if (
+                        question.questionType === "fill" ||
+                        question.questionType === "numerical"
+                      ) {
+                        // For fill/numerical questions, show the user's attempted answer.
+                        return (
+                          <div
+                            key={questionId}
+                            className="border rounded-lg p-4"
+                          >
+                            <p className="font-medium text-gray-900">
+                              {question.question}
+                            </p>
+                            <div className="mt-2">
+                              <p className="text-sm text-gray-600">
+                                Your Answer:{" "}
+                                {userAns[0] ? userAns[0] : "No answer provided"}
+                              </p>
+                              <p className="text-sm text-green-600">
+                                Correct Answer:{" "}
+                                {Array.isArray(question.correct_answer)
+                                  ? question.correct_answer[0]
+                                  : question.correct_answer}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      );
+                        );
+                      } else {
+                        // For multiple choice questions, show options.
+                        return (
+                          <div
+                            key={questionId}
+                            className="border rounded-lg p-4"
+                          >
+                            <p className="font-medium text-gray-900">
+                              {question.question}
+                            </p>
+                            <div className="mt-2 space-y-2">
+                              {question.options.map((option, index) => {
+                                const normalizedOption = normalize(option);
+                                const normalizedUserAns = (
+                                  Array.isArray(userAns) ? userAns : [userAns]
+                                ).map(normalize);
+
+                                const isCorrect =
+                                  correctAnswers.includes(normalizedOption);
+                                const isSelected =
+                                  normalizedUserAns.includes(normalizedOption);
+
+                                let label = "";
+                                if (isCorrect) {
+                                  label = isSelected
+                                    ? " (Your correct answer)"
+                                    : " (correct answer)";
+                                } else if (isSelected) {
+                                  label = " (Your answer)";
+                                }
+
+                                const bgColor =
+                                  isSelected === isCorrect
+                                    ? isCorrect
+                                      ? "bg-green-100"
+                                      : "bg-gray-50"
+                                    : isSelected
+                                    ? "bg-red-100"
+                                    : "bg-green-100";
+
+                                const textColor =
+                                  isSelected === isCorrect
+                                    ? isCorrect
+                                      ? "text-green-800"
+                                      : "text-gray-700"
+                                    : isSelected
+                                    ? "text-red-800"
+                                    : "text-green-800";
+
+                                return (
+                                  <div
+                                    key={index}
+                                    className={`p-2 rounded ${bgColor} ${textColor}`}
+                                  >
+                                    {option}
+                                    {label}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      }
                     })}
                   </div>
                 )}
@@ -971,6 +1757,24 @@ const handleJoin = async (e) => {
     </div>
   );
 }
+
+export async function getStudentDashboardData(studentId) {
+  // This example assumes you have a table named 'student_dashboard'
+  // with columns: quizTitle, tab_switch_count, desktop_change_count, and studentId.
+  const { data, error } = await supabase
+    .from("student_dashboard")
+    .select("quizTitle, tab_switch_count, desktop_change_count")
+    .eq("studentId", studentId);
+
+  if (error) {
+    throw error;
+  }
+  // Adjust as needed: here we return the first record if available.
+  return data && data.length > 0
+    ? data[0]
+    : { quizTitle: "", tab_switch_count: 0, desktop_change_count: 0 };
+}
+
 export default function StudentDashboard() {
   return (
     <div className="flex min-h-screen bg-gray-100">
